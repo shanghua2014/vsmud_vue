@@ -2,10 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run npm dev", // 启动配置的名称
+            "name": "dev", // 启动配置的名称
             "type": "node-terminal", // 类型为 Node.js 终端
             "request": "launch", // 请求类型为启动
             "command": "npm run dev", // 要执行的 npm 命令
+            "cwd": "${workspaceFolder}" // 命令执行的当前工作目录为工作区根目录
+        },
+        {
+            "name": "serve", // 启动配置的名称
+            "type": "node-terminal", // 类型为 Node.js 终端
+            "request": "launch", // 请求类型为启动
+            "command": "npm run serve", // 要执行的 npm 命令
             "cwd": "${workspaceFolder}" // 命令执行的当前工作目录为工作区根目录
         }
     ]

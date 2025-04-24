@@ -3,5 +3,54 @@ body {
     height: 100%;
     width: 100%;
     margin: 0;
-    background-color: azure;
+    padding: 0;
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 18px;
+    font-family: 'Sarasa Mono SC Nerd', 'Cascadia Mono', monospace, 'Courier New', Courier;
+}
+:root {
+    --el-color-jingli: #bd89e7;
+    --el-color-zhenqi: #88ceee;
+    --el-color-jingqi: #d6d080;
+    --el-color-food: #d6aa80;
+    --el-color-drink: #95b5e0;
+    --el-color-qixue: red;
+    --el-color-neili: blue;
+}
+.wid100 {
+    width: 100%;
+}
+.hei100 {
+    height: 100%;
+}
+.pr {
+    position: relative;
+}
+.pa {
+    position: absolute;
+}
+.flex-column {
+    flex-direction: column;
+}
+.flex-1 {
+    flex: 1;
+}
+.red {
+    color: var(--el-color-qixue);
+}
+.green {
+    color: green;
+}
+.chartreuse {
+    color: chartreuse;
+}
+.aqua {
+    color: aqua;
+}
+.yellow {
+    color: yellow;
+}
+.blueviolet {
+    color: blueviolet;
 }
