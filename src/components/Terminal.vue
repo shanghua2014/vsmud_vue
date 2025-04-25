@@ -63,6 +63,7 @@ onMounted(() => {
         }
     })
 
+    // 监听来自 vscode 扩展的消息
     window.addEventListener('message', (event) => {
         if (location.protocol === 'http:') return
         const message = event.data
@@ -73,25 +74,25 @@ onMounted(() => {
                 break
         }
     })
-})
 
-// 处理用户输入的命令
-const handleCommand = (command: string, terminal: any) => {
-    console.log('handleCommand方法')
-    if (command === '') {
-        terminal.value.write(`${command}\r\n`)
-    } else if (command === 'clear') {
-        terminal.value.clear() // 清空终端
-    } else if (command === 'help') {
-        terminal.value.write('Available commands: clear, help\r\n')
-    } else {
-        terminal.value.write(`${command}\r\n`)
-        if (location.protocol === 'http:') return
-        // 发送消息给 vscode 扩展
-        window.customParent.postMessage({ type: 'command', content: command })
+    if (terminal.value) {
+        // 监听滚动事件
+        const xtermView = document.getElementsByClassName('xterm-viewport')[0] as HTMLElement
+        xtermView.addEventListener('scroll', () => {
+            // 表示滚动条的当前位置加上视口高度，代表滚动条的底部位置。
+            let h1 = xtermView.scrollTop + xtermView.clientHeight
+            let h2 = xtermView.scrollHeight
+            if (h1 >= h2) {
+                // 滚动到底部，自动聚焦到 el-input
+                inputRef.value?.focus()
+            } else {
+                if (h1 - h2 < 10) {
+                    console.log('显示置底按钮')
+                }
+            }
+        })
     }
-    terminal.value.scrollToBottom() // 确保光标在最底部
-}
+})
 
 // 处理输入框的输入
 const handleInput = () => {
@@ -100,6 +101,24 @@ const handleInput = () => {
         handleCommand(command, terminal)
         inputBox.value = '' // 清空输入框
     }
+}
+
+// 处理用户输入的命令
+const handleCommand = (command: string, terminal: any) => {
+    if (command === '') {
+        terminal.value.write(`${command}\r\n`)
+    } else if (command === 'clear') {
+        terminal.value.clear() // 清空终端
+    } else if (command === 'help') {
+        terminal.value.write('Available commands: clear, help\r\n')
+    } else {
+        terminal.value.write(`${command}\r\n`)
+        if (location.protocol !== 'http:') {
+            // 发送消息给 vscode 扩展
+            window.customParent.postMessage({ type: 'command', content: command })
+        }
+    }
+    terminal.value.scrollToBottom() // 确保光标在最底部
 }
 </script>
 
@@ -122,6 +141,10 @@ const handleInput = () => {
 
     div.xterm {
         div.xterm-rows {
+            > div {
+                margin: 0 5px;
+                box-sizing: border-box;
+            }
             span.xterm-cursor.xterm-cursor-outline,
             span.xterm-cursor.xterm-cursor-block {
                 opacity: 0;
