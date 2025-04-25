@@ -1,7 +1,13 @@
 html,
-body {
+body,
+#app,
+#terminal-container,
+.terminal-container {
     height: 100%;
     width: 100%;
+}
+html,
+body {
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -18,6 +24,7 @@ body {
     --el-color-qixue: red;
     --el-color-neili: blue;
 }
+
 .wid100 {
     width: 100%;
 }
