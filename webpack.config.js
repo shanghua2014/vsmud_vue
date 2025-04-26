@@ -16,10 +16,22 @@ module.exports = {
         static: {
             directory: path.join(__dirname, 'public')
         },
-        compress: true,
+        compress: true, // 启用 gzip 压缩
         port: 9000,
-        hot: true,
-        historyApiFallback: true
+        hot: true, // 启用热更新
+        historyApiFallback: true, // 支持 HTML5 路由
+        client: {
+            overlay: false // 禁用错误覆盖层，减少前端渲染压力
+        },
+        watchFiles: {
+            paths: ['src/**/*', 'public/**/*'], // 仅监听必要的文件
+            options: {
+                ignored: /node_modules/ // 忽略 node_modules
+            }
+        },
+        devMiddleware: {
+            writeToDisk: false // 禁止将文件写入磁盘，仅保留内存中
+        }
     },
     module: {
         rules: [

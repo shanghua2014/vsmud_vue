@@ -87,7 +87,7 @@ onMounted(() => {
                 inputRef.value?.focus()
             } else {
                 if (h1 - h2 < 10) {
-                    console.log('显示置底按钮')
+                    // console.log('显示置底按钮')
                 }
             }
         })
