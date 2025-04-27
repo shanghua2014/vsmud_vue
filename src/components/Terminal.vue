@@ -15,7 +15,7 @@ import 'xterm/css/xterm.css'
 
 // Props
 const props = defineProps<{
-    terminalDatas: string
+    terminalDatas: Object
 }>()
 
 declare global {
@@ -49,7 +49,8 @@ onMounted(() => {
     if (terminalContainer.value) {
         terminal.value.open(terminalContainer.value)
         fitAddon.fit() // 调整终端尺寸以适应容器
-        terminal.value.write(`${props.terminalDatas}\r\n`)
+        console.log(props.terminalDatas)
+        // terminal.value.write(`${props.terminalDatas}\r\n`)
     }
 
     // 聚焦到 el-input
