@@ -49,7 +49,7 @@ onMounted(() => {
     if (terminalContainer.value) {
         terminal.value.open(terminalContainer.value)
         fitAddon.fit() // 调整终端尺寸以适应容器
-        console.log(props.terminalDatas)
+        // console.log(props.terminalDatas)
         // terminal.value.write(`${props.terminalDatas}\r\n`)
     }
 

@@ -1,11 +1,11 @@
 <template>
     <el-row class="mud-list">
-        <el-card v-for="(card, index) in cards" :key="index" shadow="always" class="card-item" @click.native.stop="handleCardClick(card)">
+        <el-card v-for="(card, index) in cards" :key="index" shadow="always" class="card-item" @click.native.stop="emits.cardClicked(card)">
             <template #header>
                 <div class="card-header">
                     <!-- 动态切换为 span 或 input -->
                     <span v-if="!card.isEditing">{{ card.headerTitle }}</span>
-                    <input v-else placeholder="Mud名称" v-model="card.headerTitle" />
+                    <input v-else ref="headerTitle" placeholder="Mud名称" v-model="card.headerTitle" />
                 </div>
             </template>
             <div class="card-body pr">
@@ -13,16 +13,16 @@
                 <template v-if="!card.isEditing">
                     <p>服务器：{{ card.server }}</p>
                     <p>端口：{{ card.port }}</p>
-                    <p>名称：{{ card.name }}</p>
                     <p>账号：{{ card.account }}</p>
                     <p>密码：{{ card.password }}</p>
+                    <p>名称：{{ card.name }}</p>
                 </template>
                 <template v-else>
                     <input v-model="card.server" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
-                    <input v-model="card.name" placeholder="名称" />
                     <input v-model="card.account" placeholder="账号" />
                     <input v-model="card.password" placeholder="密码" />
+                    <input v-model="card.name" placeholder="名称" />
                 </template>
                 <div class="edit-box pa" v-if="!card.isEditing">
                     <!-- 编辑按钮 -->
@@ -46,36 +46,37 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Edit, CloseBold, Delete, Plus } from '@element-plus/icons-vue'
 
+declare global {
+    interface Window {
+        customParent: {
+            postMessage: (message: any) => void
+        }
+    }
+}
+
+// 是否为创建状态
+const isCreated = ref(false)
 // 定义 emit 函数
 const emit = defineEmits(['card-clicked'])
 // 控制卡片是否可点
 const cardClick = ref(true)
-
+// 定义headerTitle的ref
+const headerTitle = ref<HTMLInputElement[]>([])
 // 定义卡片列表
-const cards = ref([
-    {
-        isEditing: false,
-        headerTitle: '北大侠客行',
-        server: '0.0.0.0',
-        port: '5555',
-        account: 'shanghua',
-        password: '123456',
-        name: '侠客'
-    },
-    {
-        isEditing: false,
-        headerTitle: '天龙八部',
-        server: '192.168.1.1',
-        port: '8888',
-        account: 'xiaolong',
-        password: 'abcdef',
-        name: '天龙'
-    }
-])
+interface CardModel {
+    isEditing: boolean
+    headerTitle: string
+    server: string
+    port: string
+    account: string
+    password: string
+    name: string
+}
+const cards = ref<CardModel[]>([])
 
 // 切换编辑模式
 const toggleEdit = (card: any) => {
@@ -109,6 +110,28 @@ const saveChanges = (card: any) => {
         })
         return
     }
+    if (!card.account.trim()) {
+        ElMessage({
+            message: '请输入账号！',
+            type: 'error',
+            duration: 1000 // 提示持续时间（毫秒）
+        })
+        return
+    }
+    if (isCreated.value) {
+        window.customParent.postMessage({
+            type: 'config',
+            content: {
+                headerTitle: card.headerTitle,
+                server: card.server,
+                port: card.port,
+                account: card.account,
+                password: card.password,
+                name: card.name
+            }
+        })
+        isCreated.value = false
+    }
     ElMessage({
         message: '修改成功！',
         type: 'success',
@@ -130,6 +153,7 @@ const cancelEdit = (card: any, index: number) => {
         card.isEditing = false
     }
     cardClick.value = true
+    isCreated.value ? (isCreated.value = false) : ''
 }
 
 // 确认删除
@@ -140,23 +164,27 @@ const confirmDelete = (index: number) => {
         type: 'warning'
     })
         .then(() => {
-            deleteCard(index) // 确认后删除卡片
+            const deleted = ref(deleteCard(index)) // 确认后删除卡片
+            console.log('删除的卡片:', deleted.value[0].account)
+            window.customParent.postMessage({
+                type: 'delete',
+                content: { account: deleted.value[0].account }
+            })
         })
-        .catch(() => {
-            console.log('取消删除')
+        .catch((e) => {
+            console.log('取消删除', e)
         })
 }
 
 // 删除卡片
 const deleteCard = (index: number) => {
-    cards.value.splice(index, 1) // 从列表中移除对应的卡片
-    console.log('删除成功，当前卡片列表:', cards.value)
+    return cards.value.splice(index, 1) // 从列表中移除对应的卡片
 }
 
 // 添加卡片
 const addCard = () => {
     cards.value.push({
-        isEditing: true, // 新增卡片默认进入编辑模式
+        isEditing: true,
         headerTitle: '',
         server: '',
         port: '',
@@ -165,15 +193,49 @@ const addCard = () => {
         name: ''
     })
     cardClick.value = false
+    isCreated.value = true
+
+    // 在下一个tick中聚焦到最后一个输入框
+    nextTick(() => {
+        const lastInput = headerTitle.value[headerTitle.value.length - 1]
+        lastInput?.focus()
+    })
 }
 
-const handleCardClick = (card: any) => {
-    // 如果卡片处于编辑状态，则不触发点击事件
-    if (!cardClick.value) {
-        return
+// =======================
+//    传给父级的事件
+// =======================
+const emits = {
+    cardClicked: (card: any) => {
+        // 如果卡片处于编辑状态，则不触发点击事件
+        if (!cardClick.value) {
+            return
+        }
+        // 创建新卡片时，给服务器发送消息
+        window.customParent.postMessage({
+            type: 'config',
+            content: {
+                headerTitle: card.headerTitle,
+                server: card.server,
+                port: card.port,
+                account: card.account,
+                password: card.password,
+                name: card.name
+            }
+        })
+        emit('card-clicked', card)
     }
-    emit('card-clicked', card)
 }
+
+onMounted(() => {
+    window.addEventListener('message', (event) => {
+        const message = event.data
+        if (message.type === 'getConfig') {
+            console.log('VS-MudList组件：', message.data)
+            cards.value = message.data
+        }
+    })
+})
 </script>
 
 <style lang="scss" scoped>
