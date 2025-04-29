@@ -11,8 +11,28 @@ declare global {
     }
 }
 
+// 公共类库
 export class Base {
     public postMessage(msg: Message) {
-        location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, content: msg.content })
+        location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, data: msg.content })
+    }
+}
+
+// xTerm 逻辑类库
+export class Loginc {
+    private base: Base
+
+    constructor() {
+        this.base = new Base()
+    }
+
+    public termWrite(terminal: any, message: any) {
+        if (/你|您的英文名/.test(message.data)) {
+            // 调用 postMessage 方法
+            this.base.postMessage({
+                type: 'command',
+                content: { name: message.data.account }
+            })
+        }
     }
 }

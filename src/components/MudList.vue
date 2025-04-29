@@ -52,6 +52,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Edit, CloseBold, Delete, Plus } from '@element-plus/icons-vue'
 import { Base } from '@/global'
+import { useConfigStore } from '@/stores/sotre'
 
 declare global {
     interface Window {
@@ -146,7 +147,6 @@ const saveChanges = (card: any) => {
 
 // 取消编辑
 const cancelEdit = (card: any, index: number) => {
-    // 编辑模式，内容不能为空
     if (card.isEditing && card.account.trim()) {
         if (!card.headerTitle.trim() || !card.server.trim() || !card.port.trim() || !card.password.trim() || !card.name.trim()) {
             ElMessage({
@@ -224,25 +224,29 @@ const addCard = () => {
 //    传给父级的事件
 // =======================
 const emits = {
+    // 点击卡片，连接服务器
     cardClicked: (card: any) => {
         // 如果卡片处于编辑状态，则不触发点击事件
         if (!cardClick.value) {
             return
         }
-        // 创建新卡片时，给服务器发送消息
-        location.protocol != 'http:' &&
-            window.customParent.postMessage({
-                type: 'config',
-                content: {
-                    headerTitle: card.headerTitle,
-                    server: card.server,
-                    port: card.port,
-                    account: card.account,
-                    password: card.password,
-                    name: card.name
-                }
-            })
         emit('card-clicked', card)
+
+        const datas = {
+            headerTitle: card.headerTitle,
+            server: card.server,
+            port: card.port,
+            account: card.account,
+            password: card.password,
+            name: card.name
+        }
+        base.postMessage({
+            type: 'connect',
+            content: datas
+        })
+        // 设置store
+        const configStore = useConfigStore()
+        configStore.setConfig(datas)
     }
 }
 

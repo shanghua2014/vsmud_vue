@@ -10,8 +10,9 @@ import { onMounted, ref } from 'vue'
 import { ElInput } from 'element-plus'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
-
 import 'xterm/css/xterm.css'
+import { Base, Loginc } from '@/global'
+import { useConfigStore } from '@/stores/sotre'
 
 // Props
 const props = defineProps<{
@@ -25,6 +26,10 @@ declare global {
         }
     }
 }
+
+const configStore = useConfigStore()
+const base = new Base()
+const logic = new Loginc()
 
 // 使用 ref 获取 DOM 元素
 const terminalContainer = ref<HTMLDivElement | null>(null)
@@ -71,7 +76,7 @@ onMounted(() => {
         console.log('vue,我收到了消息', message)
         switch (message.type) {
             case 'mud':
-                terminal.value && terminal.value.write(message.data)
+                logic.termWrite(terminal, message.data)
                 break
         }
     })
