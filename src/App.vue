@@ -30,7 +30,7 @@ onMounted(() => {
     //         console.log('来自VS的消息:', message.data)
     //     }
     // })
-    window.customParent.postMessage({ type: 'getConfig', content: '' })
+    location.protocol != 'http:' && window.customParent.postMessage({ type: 'getConfig', content: '' })
 })
 
 // 组件卸载时断开观察器

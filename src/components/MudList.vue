@@ -239,43 +239,5 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.mud-list {
-    flex-direction: row;
-    position: relative;
-    input {
-        width: 100%;
-        box-sizing: border-box;
-    }
-    .el-card {
-        cursor: pointer;
-    }
-    .card-item {
-        width: 20%;
-        margin: 10px 0 0 10px;
-    }
-    .card-body {
-        font-size: 14px;
-        input {
-            margin-bottom: 2px;
-            padding: 2px;
-            font-size: 14px;
-        }
-        .edit-box {
-            bottom: -28px;
-            right: -14px;
-        }
-        .submit-box {
-            margin-top: 20px;
-        }
-    }
-    .add-card {
-        display: flex;
-        align-items: end;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        margin-left: 10px;
-        button {
-            @extend .el-card;
-        }
-    }
-}
+@import url(./mudlist.scss);
 </style>
