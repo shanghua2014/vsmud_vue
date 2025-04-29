@@ -2,27 +2,29 @@
     <el-row class="mud-list">
         <el-card v-for="(card, index) in cards" :key="index" shadow="always" class="card-item" @click.native.stop="emits.cardClicked(card)">
             <template #header>
-                <div class="card-header">
+                <div class="card-header aqua">
                     <!-- 动态切换为 span 或 input -->
-                    <span v-if="!card.isEditing">{{ card.headerTitle }}</span>
-                    <input v-else ref="headerTitle" placeholder="Mud名称" v-model="card.headerTitle" />
+                    <span v-if="!card.isEditing">
+                        <b>{{ card.headerTitle }}</b>
+                    </span>
+                    <input v-else ref="headerTitle" placeholder="Mud角色" v-model="card.headerTitle" />
                 </div>
             </template>
             <div class="card-body pr">
                 <!-- 动态切换为 p 或 input -->
                 <template v-if="!card.isEditing">
-                    <p>服务器：{{ card.server }}</p>
-                    <p>端口：{{ card.port }}</p>
-                    <p>账号：{{ card.account }}</p>
-                    <p>密码：{{ card.password }}</p>
-                    <p>名称：{{ card.name }}</p>
+                    <p class="chartreuse">服务器：{{ card.server }}</p>
+                    <p class="chartreuse">端口：{{ card.port }}</p>
+                    <p class="yellow">账号：{{ card.account }}</p>
+                    <p class="blueviolet">密码：{{ card.password }}</p>
+                    <p>角色：{{ card.name }}</p>
                 </template>
                 <template v-else>
                     <input v-model="card.server" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
                     <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
                     <input v-model="card.password" placeholder="密码" />
-                    <input v-model="card.name" placeholder="名称" />
+                    <input v-model="card.name" placeholder="角色" />
                 </template>
                 <div class="edit-box pa" v-if="!card.isEditing && cardClick">
                     <!-- 编辑按钮 -->
@@ -87,11 +89,11 @@ const toggleEdit = (card: any) => {
 
 const base = new Base()
 
-// 保存修改
+// 添加、修改
 const saveChanges = (card: any) => {
     if (!card.headerTitle.trim()) {
         ElMessage({
-            message: '请输入Mud名称！',
+            message: '请输入Mud角色！',
             type: 'error',
             duration: 1000 // 提示持续时间（毫秒）
         })
@@ -121,19 +123,17 @@ const saveChanges = (card: any) => {
         })
         return
     }
-    if (isCreated.value) {
-        base.postMessage({
-            type: 'config',
-            content: {
-                headerTitle: card.headerTitle,
-                server: card.server,
-                port: card.port,
-                account: card.account,
-                password: card.password,
-                name: card.name
-            }
-        })
-    }
+    base.postMessage({
+        type: 'config',
+        content: {
+            headerTitle: card.headerTitle,
+            server: card.server,
+            port: card.port,
+            account: card.account,
+            password: card.password,
+            name: card.name
+        }
+    })
     ElMessage({
         message: isCreated.value ? '添加成功！' : '修改成功！',
         type: 'success',
@@ -146,6 +146,17 @@ const saveChanges = (card: any) => {
 
 // 取消编辑
 const cancelEdit = (card: any, index: number) => {
+    // 编辑模式，内容不能为空
+    if (card.isEditing && card.account.trim()) {
+        if (!card.headerTitle.trim() || !card.server.trim() || !card.port.trim() || !card.password.trim() || !card.name.trim()) {
+            ElMessage({
+                message: '内容不能为空！',
+                type: 'error',
+                duration: 1000 // 提示持续时间（毫秒）
+            })
+            return
+        }
+    }
     // 检查是否是新添加的卡片（内容为空）
     if (!card.headerTitle.trim() && !card.server.trim() && !card.port.trim() && !card.account.trim() && !card.password.trim() && !card.name.trim()) {
         // 如果内容为空，删除该卡片
@@ -155,6 +166,7 @@ const cancelEdit = (card: any, index: number) => {
         if (isCreated.value) {
             cards.value.splice(index, 1)
         }
+
         // 编辑模式，直接退出
         card.isEditing = false
     }

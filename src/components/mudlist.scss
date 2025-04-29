@@ -15,10 +15,10 @@
             position: absolute;
             bottom: -28px;
             right: -14px;
-            display: none; // 初始隐藏;
+            display: none;
         }
         &:hover .edit-box {
-            display: block; // 鼠标悬停时显示
+            display: block;
         }
     }
     .card-body {

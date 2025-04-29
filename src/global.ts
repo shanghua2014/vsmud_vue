@@ -13,6 +13,6 @@ declare global {
 
 export class Base {
     public postMessage(msg: Message) {
-        location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, data: msg.content })
+        location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, content: msg.content })
     }
 }
