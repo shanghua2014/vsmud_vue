@@ -11,6 +11,15 @@
     .card-item {
         width: 20%;
         margin: 10px 0 0 10px;
+        .edit-box {
+            position: absolute;
+            bottom: -28px;
+            right: -14px;
+            display: none; // 初始隐藏;
+        }
+        &:hover .edit-box {
+            display: block; // 鼠标悬停时显示
+        }
     }
     .card-body {
         font-size: 14px;
@@ -18,10 +27,6 @@
             margin-bottom: 2px;
             padding: 2px;
             font-size: 14px;
-        }
-        .edit-box {
-            bottom: -28px;
-            right: -14px;
         }
         .submit-box {
             margin-top: 20px;

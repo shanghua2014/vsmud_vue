@@ -20,11 +20,11 @@
                 <template v-else>
                     <input v-model="card.server" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
-                    <input v-model="card.account" placeholder="账号" />
+                    <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
                     <input v-model="card.password" placeholder="密码" />
                     <input v-model="card.name" placeholder="名称" />
                 </template>
-                <div class="edit-box pa" v-if="!card.isEditing">
+                <div class="edit-box pa" v-if="!card.isEditing && cardClick">
                     <!-- 编辑按钮 -->
                     <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card)" />
                     <!-- 删除按钮 -->
@@ -40,7 +40,7 @@
         </el-card>
         <!-- 添加按钮 -->
         <div class="add-card">
-            <el-button type="primary" :icon="Plus" round @click="addCard">添加</el-button>
+            <el-button type="primary" :icon="Plus" round @click="addCard" :disabled="!cardClick">添加</el-button>
         </div>
     </el-row>
 </template>
@@ -49,6 +49,7 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Edit, CloseBold, Delete, Plus } from '@element-plus/icons-vue'
+import { Base } from '@/global'
 
 declare global {
     interface Window {
@@ -83,6 +84,8 @@ const toggleEdit = (card: any) => {
     card.isEditing = true
     cardClick.value = !card.isEditing
 }
+
+const base = new Base()
 
 // 保存修改
 const saveChanges = (card: any) => {
@@ -119,7 +122,7 @@ const saveChanges = (card: any) => {
         return
     }
     if (isCreated.value) {
-        window.customParent.postMessage({
+        base.postMessage({
             type: 'config',
             content: {
                 headerTitle: card.headerTitle,
@@ -130,13 +133,13 @@ const saveChanges = (card: any) => {
                 name: card.name
             }
         })
-        isCreated.value = false
     }
     ElMessage({
-        message: '修改成功！',
+        message: isCreated.value ? '添加成功！' : '修改成功！',
         type: 'success',
         duration: 1000 // 提示持续时间（毫秒）
     })
+    isCreated.value = false
     card.isEditing = false
     cardClick.value = !card.isEditing
 }
@@ -147,9 +150,12 @@ const cancelEdit = (card: any, index: number) => {
     if (!card.headerTitle.trim() && !card.server.trim() && !card.port.trim() && !card.account.trim() && !card.password.trim() && !card.name.trim()) {
         // 如果内容为空，删除该卡片
         cards.value.splice(index, 1)
-        console.log('取消编辑并删除空卡片:', card)
     } else {
-        // 如果内容不为空，仅退出编辑模式
+        // 创建模式，删除该卡片
+        if (isCreated.value) {
+            cards.value.splice(index, 1)
+        }
+        // 编辑模式，直接退出
         card.isEditing = false
     }
     cardClick.value = true
@@ -212,17 +218,18 @@ const emits = {
             return
         }
         // 创建新卡片时，给服务器发送消息
-        window.customParent.postMessage({
-            type: 'config',
-            content: {
-                headerTitle: card.headerTitle,
-                server: card.server,
-                port: card.port,
-                account: card.account,
-                password: card.password,
-                name: card.name
-            }
-        })
+        location.protocol != 'http:' &&
+            window.customParent.postMessage({
+                type: 'config',
+                content: {
+                    headerTitle: card.headerTitle,
+                    server: card.server,
+                    port: card.port,
+                    account: card.account,
+                    password: card.password,
+                    name: card.name
+                }
+            })
         emit('card-clicked', card)
     }
 }
