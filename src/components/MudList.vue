@@ -1,80 +1,67 @@
 <template>
     <el-row class="mud-list">
-        <el-card v-for="(card, index) in cards" :key="index" shadow="always" class="card-item" @click.native.stop="emits.cardClicked(card)">
+        <el-card v-for="(card, index) in cards" :key="index" shadow="always" class="card-item" @click.native.stop="allowClicked(card)">
             <template #header>
                 <div class="card-header aqua">
                     <!-- 动态切换为 span 或 input -->
-                    <span v-if="!card.isEditing">
-                        <b>{{ card.headerTitle }}</b>
+                    <span v-if="!isCreated">
+                        <b>{{ card.title }}</b>
                     </span>
-                    <input v-else ref="headerTitle" placeholder="Mud角色" v-model="card.headerTitle" />
+                    <input v-else ref="title" placeholder="Mud角色" v-model="card.title" />
                 </div>
             </template>
             <div class="card-body pr">
                 <!-- 动态切换为 p 或 input -->
-                <template v-if="!card.isEditing">
-                    <p class="chartreuse">服务器：{{ card.server }}</p>
+                <template v-if="!isCreated">
+                    <p class="chartreuse">服务器：{{ card.ip }}</p>
                     <p class="chartreuse">端口：{{ card.port }}</p>
                     <p class="yellow">账号：{{ card.account }}</p>
                     <p class="blueviolet">密码：{{ card.password }}</p>
                     <p>角色：{{ card.name }}</p>
                 </template>
                 <template v-else>
-                    <input v-model="card.server" placeholder="服务器" />
+                    <input v-model="card.ip" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
                     <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
                     <input v-model="card.password" placeholder="密码" />
                     <input v-model="card.name" placeholder="角色" />
                 </template>
-                <div class="edit-box pa" v-if="!card.isEditing && cardClick">
+                <div class="edit-box pa" v-if="!isCreated && cardClick">
                     <!-- 编辑按钮 -->
-                    <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card)" />
+                    <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card, true)" />
                     <!-- 删除按钮 -->
                     <el-button type="danger" size="small" :icon="Delete" round @click.native.stop="confirmDelete(index)" />
                 </div>
-                <div class="submit-box" v-if="card.isEditing">
+                <div class="submit-box" v-if="isCreated">
                     <!-- 保存按钮 -->
                     <el-button type="success" size="small" :icon="Check" round @click.native.stop="saveChanges(card)" />
                     <!-- 取消按钮 -->
-                    <el-button type="danger" size="small" :icon="CloseBold" round @click.native.stop="cancelEdit(card, index)" />
+                    <el-button type="danger" size="small" :icon="CloseBold" round @click.native.stop="cancelEdit(card)" />
                 </div>
             </div>
         </el-card>
-        <!-- 添加按钮 -->
-        <div class="add-card">
-            <el-button type="primary" :icon="Plus" round @click="addCard" :disabled="!cardClick">添加</el-button>
-        </div>
     </el-row>
 </template>
 
 <script lang="ts" setup>
 import { ref, nextTick, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Edit, CloseBold, Delete, Plus } from '@element-plus/icons-vue'
+import { Check, Edit, CloseBold, Delete } from '@element-plus/icons-vue'
 import { Base } from '@/global'
 import { useConfigStore } from '@/stores/sotre'
 
-declare global {
-    interface Window {
-        customParent: {
-            postMessage: (message: any) => void
-        }
-    }
-}
-
 // 是否为创建状态
 const isCreated = ref(false)
-// 定义 emit 函数
-const emit = defineEmits(['card-clicked'])
+const allowClick = ref(true)
 // 控制卡片是否可点
 const cardClick = ref(true)
-// 定义headerTitle的ref
-const headerTitle = ref<HTMLInputElement[]>([])
+// 定义title的ref
+const title = ref<HTMLInputElement[]>([])
 // 定义卡片列表
 interface CardModel {
     isEditing: boolean
-    headerTitle: string
-    server: string
+    title: string
+    ip: string
     port: string
     account: string
     password: string
@@ -83,72 +70,52 @@ interface CardModel {
 const cards = ref<CardModel[]>([])
 
 // 切换编辑模式
-const toggleEdit = (card: any) => {
-    card.isEditing = true
-    cardClick.value = !card.isEditing
+const toggleEdit = (card: any, edit: boolean) => {
+    card.isEditing = edit
+    isCreated.value = true
+    allowClick.value = !card.isEditing
 }
 
 const base = new Base()
 
+// 封装函数处理 card 属性的 trim 操作
+const getTrimData = (card: any) => {
+    return {
+        title: card.title.trim(),
+        ip: card.ip.trim(),
+        port: card.port.trim(),
+        account: card.account.trim(),
+        password: card.password.trim(),
+        name: card.name.trim()
+    }
+}
+
 // 添加、修改
 const saveChanges = (card: any) => {
-    if (!card.headerTitle.trim()) {
+    console.log('发了几次请求？')
+
+    // 更新函数调用
+    const trimData = getTrimData(card)
+    if (!trimData.title || !trimData.ip || !trimData.port || !trimData.password || !trimData.name) {
         ElMessage({
-            message: '请输入Mud角色！',
+            message: '内容不能为空！',
             type: 'error',
             duration: 1000 // 提示持续时间（毫秒）
         })
         return
     }
-    if (!card.server.trim()) {
-        ElMessage({
-            message: '请输入服务器地址！',
-            type: 'error',
-            duration: 1000 // 提示持续时间（毫秒）
-        })
-        return
-    }
-    if (!card.server.trim()) {
-        ElMessage({
-            message: '请输入端口号！',
-            type: 'error',
-            duration: 1000 // 提示持续时间（毫秒）
-        })
-        return
-    }
-    if (!card.account.trim()) {
-        ElMessage({
-            message: '请输入账号！',
-            type: 'error',
-            duration: 1000 // 提示持续时间（毫秒）
-        })
-        return
-    }
-    base.postMessage({
-        type: 'config',
-        content: {
-            headerTitle: card.headerTitle,
-            server: card.server,
-            port: card.port,
-            account: card.account,
-            password: card.password,
-            name: card.name
-        }
-    })
-    ElMessage({
-        message: isCreated.value ? '添加成功！' : '修改成功！',
-        type: 'success',
-        duration: 1000 // 提示持续时间（毫秒）
-    })
     isCreated.value = false
     card.isEditing = false
-    cardClick.value = !card.isEditing
+    allowClick.value = !card.isEditing
 }
 
 // 取消编辑
-const cancelEdit = (card: any, index: number) => {
-    if (card.isEditing && card.account.trim()) {
-        if (!card.headerTitle.trim() || !card.server.trim() || !card.port.trim() || !card.password.trim() || !card.name.trim()) {
+const cancelEdit = (card: any) => {
+    // 更新函数调用
+    const trimData = getTrimData(card)
+
+    if (card.isEditing && trimData.account) {
+        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.password || !trimData.name) {
             ElMessage({
                 message: '内容不能为空！',
                 type: 'error',
@@ -157,20 +124,29 @@ const cancelEdit = (card: any, index: number) => {
             return
         }
     }
-    // 检查是否是新添加的卡片（内容为空）
-    if (!card.headerTitle.trim() && !card.server.trim() && !card.port.trim() && !card.account.trim() && !card.password.trim() && !card.name.trim()) {
-        // 如果内容为空，删除该卡片
-        cards.value.splice(index, 1)
-    } else {
-        // 创建模式，删除该卡片
-        if (isCreated.value) {
-            cards.value.splice(index, 1)
-        }
 
-        // 编辑模式，直接退出
-        card.isEditing = false
+    if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.password && trimData.name) {
+        if (card.isEditing) {
+            isCreated.value = false
+            card.isEditing = false
+            allowClick.value = !card.isEditing
+        } else {
+            ElMessageBox.alert('都填完了，点击保存好吗？', '温馨提示')
+            return
+        }
     }
-    cardClick.value = true
+    if (isCreated.value) {
+        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.password || !trimData.name) {
+            ElMessageBox.alert('请填写所有信息！', '温馨提示')
+            return
+        }
+        if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.password && trimData.name) {
+            ElMessageBox.alert('如想关闭，请直接关闭.vmud文件', '温馨提示')
+            return
+        }
+    }
+
+    allowClick.value = true
     isCreated.value ? (isCreated.value = false) : ''
 }
 
@@ -199,63 +175,60 @@ const deleteCard = (index: number) => {
     return cards.value.splice(index, 1) // 从列表中移除对应的卡片
 }
 
-// 添加卡片
-const addCard = () => {
-    cards.value.push({
-        isEditing: true,
-        headerTitle: '',
-        server: '',
-        port: '',
-        account: '',
-        password: '',
-        name: ''
-    })
-    cardClick.value = false
-    isCreated.value = true
+// 点击卡片
+const allowClicked = (card: any) => {
+    // 如果卡片处于编辑状态，则不触发点击事件
+    if (!allowClick.value) {
+        return
+    }
 
-    // 在下一个tick中聚焦到最后一个输入框
-    nextTick(() => {
-        const lastInput = headerTitle.value[headerTitle.value.length - 1]
-        lastInput?.focus()
+    const datas = {
+        headerTitle: card.headerTitle,
+        server: card.server,
+        port: card.port,
+        account: card.account,
+        password: card.password,
+        name: card.name
+    }
+    base.postMessage({
+        type: 'connect',
+        content: datas
     })
+    // 设置store
+    const configStore = useConfigStore()
+    configStore.setConfig(datas)
 }
 
 // =======================
 //    传给父级的事件
 // =======================
-const emits = {
-    // 点击卡片，连接服务器
-    cardClicked: (card: any) => {
-        // 如果卡片处于编辑状态，则不触发点击事件
-        if (!cardClick.value) {
-            return
-        }
-        emit('card-clicked', card)
-
-        const datas = {
-            headerTitle: card.headerTitle,
-            server: card.server,
-            port: card.port,
-            account: card.account,
-            password: card.password,
-            name: card.name
-        }
-        base.postMessage({
-            type: 'connect',
-            content: datas
-        })
-        // 设置store
-        const configStore = useConfigStore()
-        configStore.setConfig(datas)
-    }
-}
+const emits = {}
 
 onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
+        console.log('来自VS的消息:', message)
         if (message.type === 'getConfig') {
-            console.log('VS-MudList组件：', message.data)
-            cards.value = message.data
+            if (JSON.stringify(message.data) === '{}') {
+                // 创建模式
+                isCreated.value = true
+                // 禁止点击卡片
+                allowClick.value = false
+                cards.value.push({
+                    isEditing: false,
+                    title: '',
+                    ip: '',
+                    port: '',
+                    account: '',
+                    password: '',
+                    name: ''
+                })
+            } else {
+                // 正常模式
+                isCreated.value = false
+                allowClick.value = true
+                cards.value.push(message.datas)
+            }
         }
     })
 })
