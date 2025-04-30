@@ -5,7 +5,7 @@
                 <div class="card-header aqua">
                     <!-- 动态切换为 span 或 input -->
                     <span v-if="!isCreated">
-                        <b>{{ card.title }}</b>
+                        <b>{{ card.title ? card.title : '站点' }}</b>
                     </span>
                     <input v-else ref="title" placeholder="Mud角色" v-model="card.title" />
                 </div>
@@ -22,7 +22,7 @@
                 <template v-else>
                     <input v-model="card.ip" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
-                    <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
+                    <input v-model="card.account" placeholder="账号" disabled="false" />
                     <input v-model="card.password" placeholder="密码" />
                     <input v-model="card.name" placeholder="角色" />
                 </template>
@@ -49,6 +49,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Edit, CloseBold, Delete } from '@element-plus/icons-vue'
 import { Base } from '@/global'
 import { useConfigStore } from '@/stores/sotre'
+import { fa } from 'element-plus/es/locale'
 
 // 是否为创建状态
 const isCreated = ref(false)
@@ -107,6 +108,10 @@ const saveChanges = (card: any) => {
     isCreated.value = false
     card.isEditing = false
     allowClick.value = !card.isEditing
+    base.postMessage({
+        type: 'save',
+        content: trimData
+    })
 }
 
 // 取消编辑
@@ -160,7 +165,7 @@ const confirmDelete = (index: number) => {
         .then(() => {
             const deleted = ref(deleteCard(index)) // 确认后删除卡片
             console.log('删除的卡片:', deleted.value[0].account)
-            window.customParent.postMessage({
+            base.postMessage({
                 type: 'delete',
                 content: { account: deleted.value[0].account }
             })
@@ -168,6 +173,7 @@ const confirmDelete = (index: number) => {
         .catch((e) => {
             console.log('取消删除', e)
         })
+    deleteCard(0)
 }
 
 // 删除卡片
@@ -208,8 +214,10 @@ onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
         console.log('来自VS的消息:', message)
+        message.datas = JSON.parse(message.datas)
+        const { ip, account } = message.datas
         if (message.type === 'getConfig') {
-            if (JSON.stringify(message.data) === '{}') {
+            if (!ip) {
                 // 创建模式
                 isCreated.value = true
                 // 禁止点击卡片
@@ -219,7 +227,7 @@ onMounted(() => {
                     title: '',
                     ip: '',
                     port: '',
-                    account: '',
+                    account: account,
                     password: '',
                     name: ''
                 })
