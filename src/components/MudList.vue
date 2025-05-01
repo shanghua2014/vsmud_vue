@@ -7,7 +7,7 @@
                     <span v-if="!isCreated">
                         <b>{{ card.title ? card.title : '站点' }}</b>
                     </span>
-                    <input v-else ref="title" placeholder="Mud角色" v-model="card.title" />
+                    <input v-else ref="title" placeholder="站点名称" v-model="card.title" />
                 </div>
             </template>
             <div class="card-body pr">
@@ -23,7 +23,7 @@
                     <input v-model="card.ip" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
                     <input v-model="card.account" placeholder="账号" disabled="false" />
-                    <input v-model="card.password" placeholder="密码" />
+                    <input v-model="card.password" placeholder="密码（非必填）" />
                     <input v-model="card.name" placeholder="角色" />
                 </template>
                 <div class="edit-box pa" v-if="!isCreated && cardClick">
@@ -93,11 +93,10 @@ const getTrimData = (card: any) => {
 
 // 添加、修改
 const saveChanges = (card: any) => {
-    console.log('发了几次请求？')
-
+    console.log('添加、修改')
     // 更新函数调用
     const trimData = getTrimData(card)
-    if (!trimData.title || !trimData.ip || !trimData.port || !trimData.password || !trimData.name) {
+    if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
         ElMessage({
             message: '内容不能为空！',
             type: 'error',
@@ -120,7 +119,7 @@ const cancelEdit = (card: any) => {
     const trimData = getTrimData(card)
 
     if (card.isEditing && trimData.account) {
-        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.password || !trimData.name) {
+        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
             ElMessage({
                 message: '内容不能为空！',
                 type: 'error',
@@ -130,7 +129,7 @@ const cancelEdit = (card: any) => {
         }
     }
 
-    if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.password && trimData.name) {
+    if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
         if (card.isEditing) {
             isCreated.value = false
             card.isEditing = false
@@ -141,11 +140,11 @@ const cancelEdit = (card: any) => {
         }
     }
     if (isCreated.value) {
-        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.password || !trimData.name) {
+        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.name) {
             ElMessageBox.alert('请填写所有信息！', '温馨提示')
             return
         }
-        if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.password && trimData.name) {
+        if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
             ElMessageBox.alert('如想关闭，请直接关闭.vmud文件', '温馨提示')
             return
         }
@@ -214,7 +213,7 @@ onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
         console.log('来自VS的消息:', message)
-        message.datas = JSON.parse(message.datas)
+        message.datas = typeof message.datas == 'string' ? JSON.parse(message.datas) : message.datas
         const { ip, account } = message.datas
         if (message.type === 'getConfig') {
             if (!ip) {
