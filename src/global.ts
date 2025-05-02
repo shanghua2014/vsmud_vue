@@ -27,12 +27,14 @@ export class Loginc {
     }
 
     public termWrite(terminal: any, message: any) {
-        if (/你|您的英文名/.test(message.data)) {
+        // console.log('vue,我收到了消息', message)
+        terminal.value.write(`${message.datas}\r\n`)
+        if (/你|您的英文名/.test(message.datas)) {
             // 调用 postMessage 方法
-            this.base.postMessage({
-                type: 'command',
-                content: { name: message.data.account }
-            })
+            // this.base.postMessage({
+            //     type: 'command',
+            //     content: { name: message.datas.account }
+            // })
         }
     }
 }

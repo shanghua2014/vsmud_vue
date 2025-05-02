@@ -15,9 +15,9 @@ import { Base, Loginc } from '@/global'
 import { useConfigStore } from '@/stores/sotre'
 
 // Props
-const props = defineProps<{
-    terminalDatas: Object
-}>()
+// const props = defineProps<{
+//     terminalDatas: Object
+// }>()
 
 declare global {
     interface Window {
@@ -54,7 +54,6 @@ onMounted(() => {
     if (terminalContainer.value) {
         terminal.value.open(terminalContainer.value)
         fitAddon.fit() // 调整终端尺寸以适应容器
-        // console.log(props.terminalDatas)
         // terminal.value.write(`${props.terminalDatas}\r\n`)
     }
 
@@ -73,10 +72,10 @@ onMounted(() => {
     window.addEventListener('message', (event) => {
         if (location.protocol === 'http:') return
         const message = event.data
-        console.log('vue,我收到了消息', message)
         switch (message.type) {
             case 'mud':
-                logic.termWrite(terminal, message.data)
+                // 处理 mud 消息
+                logic.termWrite(terminal, message)
                 break
         }
     })

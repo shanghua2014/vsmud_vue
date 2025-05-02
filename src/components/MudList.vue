@@ -49,7 +49,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Edit, CloseBold, Delete } from '@element-plus/icons-vue'
 import { Base } from '@/global'
 import { useConfigStore } from '@/stores/sotre'
-import { fa } from 'element-plus/es/locale'
 
 // 是否为创建状态
 const isCreated = ref(false)
@@ -168,11 +167,11 @@ const confirmDelete = (index: number) => {
                 type: 'delete',
                 content: { account: deleted.value[0].account }
             })
+            deleteCard(0)
         })
         .catch((e) => {
             console.log('取消删除', e)
         })
-    deleteCard(0)
 }
 
 // 删除卡片
@@ -183,59 +182,68 @@ const deleteCard = (index: number) => {
 // 点击卡片
 const allowClicked = (card: any) => {
     // 如果卡片处于编辑状态，则不触发点击事件
+    console.log('点击卡片', allowClick.value)
     if (!allowClick.value) {
         return
     }
 
     const datas = {
-        headerTitle: card.headerTitle,
-        server: card.server,
+        title: card.title,
+        ip: card.ip,
         port: card.port,
         account: card.account,
         password: card.password,
         name: card.name
     }
+    emits('cardClicked', '通知父级')
+
+    // 设置store
+    const configStore = useConfigStore()
+    configStore.setConfig(datas)
+
     base.postMessage({
         type: 'connect',
         content: datas
     })
-    // 设置store
-    const configStore = useConfigStore()
-    configStore.setConfig(datas)
 }
 
 // =======================
 //    传给父级的事件
 // =======================
-const emits = {}
+const emits = defineEmits<{
+    (event: 'cardClicked', data: any): void
+}>()
 
 onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
-        console.log('来自VS的消息:', message)
-        message.datas = typeof message.datas == 'string' ? JSON.parse(message.datas) : message.datas
-        const { ip, account } = message.datas
-        if (message.type === 'getConfig') {
-            if (!ip) {
-                // 创建模式
-                isCreated.value = true
-                // 禁止点击卡片
-                allowClick.value = false
-                cards.value.push({
-                    isEditing: false,
-                    title: '',
-                    ip: '',
-                    port: '',
-                    account: account,
-                    password: '',
-                    name: ''
-                })
-            } else {
-                // 正常模式
-                isCreated.value = false
-                allowClick.value = true
-                cards.value.push(message.datas)
+        try {
+            message.datas = typeof message.datas == 'string' ? JSON.parse(message.datas) : message.datas
+            if (message.type === 'getConfig') {
+                const { ip, account } = message.datas
+                if (!ip) {
+                    // 创建模式
+                    isCreated.value = true
+                    // 禁止点击卡片
+                    allowClick.value = false
+                    cards.value.push({
+                        isEditing: false,
+                        title: '',
+                        ip: '',
+                        port: '',
+                        account: account,
+                        password: '',
+                        name: ''
+                    })
+                } else {
+                    // 正常模式
+                    isCreated.value = false
+                    allowClick.value = true
+                    cards.value.push(message.datas)
+                }
             }
+        } catch (error) {
+            console.log('error', error)
         }
     })
 })
