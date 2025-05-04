@@ -8,16 +8,11 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue'
 import { ElInput } from 'element-plus'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
-import 'xterm/css/xterm.css'
-import { Base, Loginc } from '@/global'
-import { useConfigStore } from '@/stores/sotre'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 
-// Props
-// const props = defineProps<{
-//     terminalDatas: Object
-// }>()
+import { Base, xTermLoginc } from '@/global'
 
 declare global {
     interface Window {
@@ -27,9 +22,8 @@ declare global {
     }
 }
 
-const configStore = useConfigStore()
+const logic = new xTermLoginc()
 const base = new Base()
-const logic = new Loginc()
 
 // 使用 ref 获取 DOM 元素
 const terminalContainer = ref<HTMLDivElement | null>(null)
@@ -38,35 +32,33 @@ const inputRef = ref<InstanceType<typeof ElInput> | null>(null)
 const terminal = ref<Terminal | null>(null)
 
 onMounted(() => {
-    // 初始化 xterm
     terminal.value = new Terminal({
-        cursorBlink: false, // 禁用光标闪烁
+        convertEol: true,
+        fontFamily: 'Fira Code, Sarasa Mono SC Nerd, Courier New, monospace',
         fontSize: 14,
+        lineHeight: 1.2, // 适当增大行高
         theme: {
-            background: '#1e1e1e',
-            foreground: '#ffffff'
+            foreground: '#D3D3D3'
         },
-        scrollback: 300 // 限制最大行数为 300 行
+        scrollback: 300, // 限制最大行数为 300 行
+        // 允许使用提议 API
+        allowProposedApi: true,
+        allowTransparency: true
     })
+
     const fitAddon = new FitAddon()
     terminal.value.loadAddon(fitAddon)
 
     if (terminalContainer.value) {
         terminal.value.open(terminalContainer.value)
         fitAddon.fit() // 调整终端尺寸以适应容器
-        // terminal.value.write(`${props.terminalDatas}\r\n`)
     }
+
+    // 终端一系列事件监听
+    logic.eventListener(terminal, inputRef, inputBox, handleCommand)
 
     // 聚焦到 el-input
     inputRef.value?.focus()
-
-    // 监听窗口大小变化，动态调整终端尺寸
-    window.addEventListener('resize', () => {
-        fitAddon.fit()
-        if (terminal.value) {
-            terminal.value.scrollToBottom() // 确保调整尺寸后光标在最底部
-        }
-    })
 
     // 监听来自 vscode 扩展的消息
     window.addEventListener('message', (event) => {
@@ -75,28 +67,10 @@ onMounted(() => {
         switch (message.type) {
             case 'mud':
                 // 处理 mud 消息
-                logic.termWrite(terminal, message)
+                logic.termWrite(terminal, message.datas)
                 break
         }
     })
-
-    if (terminal.value) {
-        // 监听滚动事件
-        const xtermView = document.getElementsByClassName('xterm-viewport')[0] as HTMLElement
-        xtermView.addEventListener('scroll', () => {
-            // 表示滚动条的当前位置加上视口高度，代表滚动条的底部位置。
-            let h1 = xtermView.scrollTop + xtermView.clientHeight
-            let h2 = xtermView.scrollHeight
-            if (h1 >= h2) {
-                // 滚动到底部，自动聚焦到 el-input
-                inputRef.value?.focus()
-            } else {
-                if (h1 - h2 < 10) {
-                    // console.log('显示置底按钮')
-                }
-            }
-        })
-    }
 })
 
 // 处理输入框的输入
@@ -104,26 +78,16 @@ const handleInput = () => {
     if (inputBox.value && terminal.value) {
         const command = inputBox.value
         handleCommand(command, terminal)
-        inputBox.value = '' // 清空输入框
     }
 }
 
 // 处理用户输入的命令
 const handleCommand = (command: string, terminal: any) => {
-    if (command === '') {
-        terminal.value.write(`${command}\r\n`)
-    } else if (command === 'clear') {
-        terminal.value.clear() // 清空终端
-    } else if (command === 'help') {
-        terminal.value.write('Available commands: clear, help\r\n')
-    } else {
-        terminal.value.write(`${command}\r\n`)
-        if (location.protocol !== 'http:') {
-            // 发送消息给 vscode 扩展
-            window.customParent.postMessage({ type: 'command', content: command })
-        }
-    }
-    terminal.value.scrollToBottom() // 确保光标在最底部
+    base.postMessage({ type: 'command', content: command })
+    terminal.value.write(`[${command}]\r\n`, () => {
+        inputBox.value = ''
+        terminal.value.scrollToBottom() // 确保光标在最底部
+    })
 }
 </script>
 
@@ -137,6 +101,9 @@ const handleCommand = (command: string, terminal: any) => {
     .terminal-container {
         flex: 1; /* 让终端容器占据剩余空间 */
         width: 100%; /* 宽度占满 */
+        // 确保没有额外的 margin 和 padding
+        margin: 0;
+        padding: 0;
     }
 
     .terminal-input {
@@ -149,6 +116,11 @@ const handleCommand = (command: string, terminal: any) => {
             > div {
                 margin: 0 5px;
                 box-sizing: border-box;
+            }
+            span {
+                // 强制设置 letter-spacing 为 normal
+                letter-spacing: normal !important;
+                font-weight: 400;
             }
             span.xterm-cursor.xterm-cursor-outline,
             span.xterm-cursor.xterm-cursor-block {

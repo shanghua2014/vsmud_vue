@@ -106,10 +106,13 @@ const saveChanges = (card: any) => {
     isCreated.value = false
     card.isEditing = false
     allowClick.value = !card.isEditing
-    base.postMessage({
-        type: 'save',
-        content: trimData
-    })
+
+    setTimeout(() => {
+        base.postMessage({
+            type: 'save',
+            content: trimData
+        })
+    }, 500)
 }
 
 // 取消编辑
@@ -218,8 +221,10 @@ onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
         try {
-            message.datas = typeof message.datas == 'string' ? JSON.parse(message.datas) : message.datas
             if (message.type === 'getConfig') {
+                console.log(message.datas)
+                message.datas = JSON.parse(message.datas)
+                console.log('message', message.datas)
                 const { ip, account } = message.datas
                 if (!ip) {
                     // 创建模式
