@@ -64,7 +64,7 @@ export class xTermLoginc {
     }
 
     // 监听事件集合
-    public eventListener(terminal: any, inputRef: any, fitAddon: any, logic: any) {
+    public eventListener(terminal: any, inputRef: any, fitAddon: any) {
         // 监听终端内容变化事件
         terminal.value.onData(() => {
             this.resetLetterSpacing()

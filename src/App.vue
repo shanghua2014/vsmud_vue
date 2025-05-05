@@ -23,7 +23,7 @@ const receive = {
 
 // 接收来自vscode扩展的消息
 onMounted(() => {
-    new Base().postMessage({ type: 'getConfig', content: '' })
+    new Base().postMessage({ type: 'getAccount', content: '' })
 })
 
 // 组件卸载时断开观察器

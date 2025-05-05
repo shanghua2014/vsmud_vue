@@ -55,7 +55,7 @@ onMounted(() => {
     }
 
     // 终端一系列事件监听
-    logic.eventListener(terminal, inputRef, inputBox, handleCommand)
+    logic.eventListener(terminal, inputRef, fitAddon)
 
     // 聚焦到 el-input
     inputRef.value?.focus()

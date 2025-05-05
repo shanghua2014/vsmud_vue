@@ -29,8 +29,6 @@
                 <div class="edit-box pa" v-if="!isCreated && cardClick">
                     <!-- 编辑按钮 -->
                     <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card, true)" />
-                    <!-- 删除按钮 -->
-                    <el-button type="danger" size="small" :icon="Delete" round @click.native.stop="confirmDelete(index)" />
                 </div>
                 <div class="submit-box" v-if="isCreated">
                     <!-- 保存按钮 -->
@@ -156,31 +154,6 @@ const cancelEdit = (card: any) => {
     isCreated.value ? (isCreated.value = false) : ''
 }
 
-// 确认删除
-const confirmDelete = (index: number) => {
-    ElMessageBox.confirm('确定要删除这个IP吗？', '删除确认', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    })
-        .then(() => {
-            const deleted = ref(deleteCard(index)) // 确认后删除卡片
-            console.log('删除的卡片:', deleted.value[0].account)
-            base.postMessage({
-                type: 'delete',
-                content: { account: deleted.value[0].account }
-            })
-            deleteCard(0)
-        })
-        .catch((e) => {
-            console.log('取消删除', e)
-        })
-}
-
-// 删除卡片
-const deleteCard = (index: number) => {
-    return cards.value.splice(index, 1) // 从列表中移除对应的卡片
-}
 
 // 点击卡片
 const allowClicked = (card: any) => {
@@ -224,7 +197,6 @@ onMounted(() => {
             if (message.type === 'getConfig') {
                 console.log(message.datas)
                 message.datas = JSON.parse(message.datas)
-                console.log('message', message.datas)
                 const { ip, account } = message.datas
                 if (!ip) {
                     // 创建模式
