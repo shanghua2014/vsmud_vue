@@ -31,7 +31,7 @@ export class xTermLoginc {
     public termWrite(terminal: any, msg: any) {
         terminal.value.write(`${msg}\r\n`)
         const configStore = useConfigStore()
-        if (/(你|您)的英文名/.test(msg)) {
+        if (/((你|您)的英文名)|(人物请输入new。)/.test(msg)) {
             const account = configStore.configInfo?.account.trim()
             if (account) {
                 setTimeout(() => {
@@ -49,6 +49,15 @@ export class xTermLoginc {
                 this.base.postMessage({
                     type: 'command',
                     content: password
+                })
+            }
+        }
+        if (/即将开始检测你的客户端/.test(msg)) {
+            const password = configStore.configInfo?.password.trim()
+            if (password) {
+                this.base.postMessage({
+                    type: 'command',
+                    content: 'y'
                 })
             }
         }

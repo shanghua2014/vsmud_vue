@@ -154,11 +154,9 @@ const cancelEdit = (card: any) => {
     isCreated.value ? (isCreated.value = false) : ''
 }
 
-
 // 点击卡片
 const allowClicked = (card: any) => {
     // 如果卡片处于编辑状态，则不触发点击事件
-    console.log('点击卡片', allowClick.value)
     if (!allowClick.value) {
         return
     }

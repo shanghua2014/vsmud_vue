@@ -84,7 +84,7 @@ const handleInput = () => {
 // 处理用户输入的命令
 const handleCommand = (command: string, terminal: any) => {
     base.postMessage({ type: 'command', content: command })
-    terminal.value.write(`[${command}]\r\n`, () => {
+    terminal.value.write(`[ ${command} ]\r\n`, () => {
         inputBox.value = ''
         terminal.value.scrollToBottom() // 确保光标在最底部
     })
