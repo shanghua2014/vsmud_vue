@@ -42,10 +42,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Edit, CloseBold, Delete } from '@element-plus/icons-vue'
-import { Base } from '@/global'
+import { Check, Edit, CloseBold } from '@element-plus/icons-vue'
+import { Base } from '@/utils/util'
 import { useConfigStore } from '@/stores/sotre'
 
 // 是否为创建状态
@@ -191,6 +191,7 @@ const emits = defineEmits<{
 onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data
+        // console.log('收到消息', message)
         try {
             if (message.type === 'getConfig') {
                 console.log(message.datas)
@@ -225,5 +226,40 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import url(./mudlist.scss);
+.mud-list {
+    flex-direction: row;
+    position: relative;
+    input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .el-card {
+        cursor: pointer;
+    }
+    .card-item {
+        width: 20%;
+        margin: 10px 0 0 10px;
+        .edit-box {
+            position: absolute;
+            bottom: -28px;
+            right: -14px;
+            display: none;
+        }
+        &:hover .edit-box {
+            display: block;
+        }
+    }
+    .card-body {
+        font-size: 14px;
+        input {
+            margin-bottom: 2px;
+            padding: 2px;
+            font-size: 14px;
+        }
+        .submit-box {
+            margin-top: 20px;
+        }
+    }
+}
+
 </style>

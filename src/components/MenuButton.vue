@@ -18,7 +18,7 @@
 
 <script lang="ts" setup>
 import { ref } from 'vue'
-import { ArrowUp, ArrowDown, Document } from '@element-plus/icons-vue' // 导入图标组件
+import { Document } from '@element-plus/icons-vue' // 导入图标组件
 
 const activeIndex = ref('1')
 const handleSelect = (key: string, keyPath: string[]) => {
@@ -28,10 +28,10 @@ const handleSelect = (key: string, keyPath: string[]) => {
 
 <style lang="scss">
 ul.el-menu-demo {
-    height: 40px;
-    width: 90px;
+    height: 30px;
+    width: 60px;
     bottom: 34px;
-    right: 2px;
+    right: 3px;
     background: #1f1f1f;
     border: 1px solid var(--el-menu-border-color);
     justify-content: center;
@@ -50,10 +50,14 @@ div.el-menu--horizontal .el-menu .el-sub-menu__title {
     width: 90px;
 }
 div.el-popper.is-pure:first-child {
-    inset: auto 0 79px auto !important;
+    inset: auto 0 70px auto !important;
 }
 .el-menu--horizontal > .el-menu-item:nth-child(1) {
     margin-right: auto;
+}
+.el-menu--horizontal > .el-sub-menu.is-active .el-sub-menu__title,
+.el-sub-menu.is-active .el-sub-menu__title {
+    border: none !important;
 }
 /* 隐藏默认图标 */
 .el-menu--horizontal .el-sub-menu__title .el-sub-menu__icon-arrow {
