@@ -38,7 +38,7 @@ onMounted(() => {
 
 // 组件卸载时断开观察器
 onUnmounted(() => {
-    window.removeEventListener('message', () => {})
+    window.removeEventListener('message', () => { })
 })
 </script>
 
