@@ -13,7 +13,7 @@ import MenuButton from './components/MenuButton.vue'
 import { onMounted, ref, onUnmounted } from 'vue'
 import { Base } from './utils/util'
 
-const showTerminal = ref(true)
+const showTerminal = ref(false)
 const mudlist = ref<any>({})
 const hideMenuButton = ref(false)
 
@@ -38,7 +38,7 @@ onMounted(() => {
 
 // 组件卸载时断开观察器
 onUnmounted(() => {
-    window.removeEventListener('message', () => { })
+    window.removeEventListener('message', () => {})
 })
 </script>
 

@@ -122,56 +122,60 @@ export class xTermLoginc {
         terminal.value.onData(() => {
             this.resetLetterSpacing()
         })
-        window.addEventListener('keydown', (event: KeyboardEvent) => {
-            let i = 0
-            console.log(event)
-            if ((event.metaKey && event.key.toLowerCase() === 'c') || (event.ctrlKey && event.key.toLowerCase() === 'c')) {
-                // 检测 Ctrl+C 组合键
-                if (terminal.value && i == 0) {
-                    navigator.clipboard
-                        .writeText(terminal.value.getSelection())
-                        .then(() => {
-                            ElMessage({
-                                message: '复制成功',
-                                type: 'success',
-                                plain: true
-                            })
-                            inputRef.value?.focus()
-                            setTimeout(() => {
-                                i = 0
-                            }, 1000)
-                        })
-                        .catch((err) => {
-                            console.error('复制失败:', err)
-                        })
-                    i++
+        let i = 0
+        if (navigator.userAgent.indexOf('Windows') != -1) {
+            terminal.value.onKey((event: KeyboardEvent) => {
+                switch (event.key) {
+                    case '\u0003':
+                        // 检测 Ctrl+C 组合键
+                        if (terminal.value && i === 0) {
+                            navigator.clipboard
+                                .writeText(terminal.value.getSelection())
+                                .then(() => {
+                                    ElMessage({
+                                        message: '复制成功',
+                                        type: 'success',
+                                        plain: true
+                                    })
+                                    inputRef.value?.focus()
+                                    setTimeout(() => {
+                                        i = 0
+                                    }, 1000)
+                                })
+                                .catch((err) => {
+                                    console.error('复制失败:', err)
+                                })
+                            i++
+                        }
+                        break
                 }
-            }
-        })
-        // // terminal.value.onKey((event: KeyboardEvent) => {
-        //     console.log(event)
-        //     switch (event.key) {
-        //         case '\u0003':
-        //             // 检测 Ctrl+C 组合键
-        //             if (terminal.value) {
-        //                 navigator.clipboard
-        //                     .writeText(terminal.value.getSelection())
-        //                     .then(() => {
-        //                         console.log('复制成功:')
-        //                         ElMessage({
-        //                             message: '复制成功',
-        //                             type: 'success',
-        //                             plain: true
-        //                         })
-        //                         inputRef.value?.focus()
-        //                     })
-        //                     .catch((err) => {
-        //                         console.error('复制失败:', err)
-        //                     })
-        //             }
-        //             break
-        //     }
-        // })
+            })
+        } else {
+            window.addEventListener('keydown', (event: KeyboardEvent) => {
+                if (event.metaKey && event.key.toLowerCase() === 'c') {
+                    // 检测 cmd+C 组合键
+                    if (terminal.value && i == 0) {
+                        navigator.clipboard
+                            .writeText(terminal.value.getSelection())
+                            .then(() => {
+                                ElMessage({
+                                    message: '复制成功',
+                                    type: 'success',
+                                    plain: true
+                                })
+                                inputRef.value?.focus()
+                                setTimeout(() => {
+                                    i = 0
+                                }, 1000)
+                            })
+                            .catch((err) => {
+                                console.error('复制失败:', err)
+                            })
+                        i++
+                    }
+                }
+            })
+        }
 
         // 监听窗口大小变化，动态调整终端尺寸
         window.addEventListener('resize', () => {
