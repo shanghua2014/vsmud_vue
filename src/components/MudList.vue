@@ -42,39 +42,39 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Edit, CloseBold } from '@element-plus/icons-vue'
-import { Base } from '@/utils/util'
-import { useConfigStore } from '@/stores/sotre'
+import { ref, onMounted } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Check, Edit, CloseBold } from '@element-plus/icons-vue';
+import { Base } from '@/utils/util';
+import { useConfigStore } from '@/stores/store';
 
 // 是否为创建状态
-const isCreated = ref(false)
-const allowClick = ref(true)
+const isCreated = ref(false);
+const allowClick = ref(true);
 // 控制卡片是否可点
-const cardClick = ref(true)
+const cardClick = ref(true);
 // 定义title的ref
-const title = ref<HTMLInputElement[]>([])
+const title = ref<HTMLInputElement[]>([]);
 // 定义卡片列表
 interface CardModel {
-    isEditing: boolean
-    title: string
-    ip: string
-    port: string
-    account: string
-    password: string
-    name: string
+    isEditing: boolean;
+    title: string;
+    ip: string;
+    port: string;
+    account: string;
+    password: string;
+    name: string;
 }
-const cards = ref<CardModel[]>([])
+const cards = ref<CardModel[]>([]);
 
 // 切换编辑模式
 const toggleEdit = (card: any, edit: boolean) => {
-    card.isEditing = edit
-    isCreated.value = true
-    allowClick.value = !card.isEditing
-}
+    card.isEditing = edit;
+    isCreated.value = true;
+    allowClick.value = !card.isEditing;
+};
 
-const base = new Base()
+const base = new Base();
 
 // 封装函数处理 card 属性的 trim 操作
 const getTrimData = (card: any) => {
@@ -85,38 +85,38 @@ const getTrimData = (card: any) => {
         account: card.account.trim(),
         password: card.password.trim(),
         name: card.name.trim()
-    }
-}
+    };
+};
 
 // 添加、修改
 const saveChanges = (card: any) => {
-    console.log('添加、修改')
+    console.log('添加、修改');
     // 更新函数调用
-    const trimData = getTrimData(card)
+    const trimData = getTrimData(card);
     if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
         ElMessage({
             message: '内容不能为空！',
             type: 'error',
             duration: 1000 // 提示持续时间（毫秒）
-        })
-        return
+        });
+        return;
     }
-    isCreated.value = false
-    card.isEditing = false
-    allowClick.value = !card.isEditing
+    isCreated.value = false;
+    card.isEditing = false;
+    allowClick.value = !card.isEditing;
 
     setTimeout(() => {
         base.postMessage({
             type: 'save',
             content: trimData
-        })
-    }, 500)
-}
+        });
+    }, 500);
+};
 
 // 取消编辑
 const cancelEdit = (card: any) => {
     // 更新函数调用
-    const trimData = getTrimData(card)
+    const trimData = getTrimData(card);
 
     if (card.isEditing && trimData.account) {
         if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
@@ -124,41 +124,41 @@ const cancelEdit = (card: any) => {
                 message: '内容不能为空！',
                 type: 'error',
                 duration: 1000 // 提示持续时间（毫秒）
-            })
-            return
+            });
+            return;
         }
     }
 
     if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
         if (card.isEditing) {
-            isCreated.value = false
-            card.isEditing = false
-            allowClick.value = !card.isEditing
+            isCreated.value = false;
+            card.isEditing = false;
+            allowClick.value = !card.isEditing;
         } else {
-            ElMessageBox.alert('都填完了，点击保存好吗？', '温馨提示')
-            return
+            ElMessageBox.alert('都填完了，点击保存好吗？', '温馨提示');
+            return;
         }
     }
     if (isCreated.value) {
         if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.name) {
-            ElMessageBox.alert('请填写所有信息！', '温馨提示')
-            return
+            ElMessageBox.alert('请填写所有信息！', '温馨提示');
+            return;
         }
         if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
-            ElMessageBox.alert('如想关闭，请直接关闭.vmud文件', '温馨提示')
-            return
+            ElMessageBox.alert('如想关闭，请直接关闭.vmud文件', '温馨提示');
+            return;
         }
     }
 
-    allowClick.value = true
-    isCreated.value ? (isCreated.value = false) : ''
-}
+    allowClick.value = true;
+    isCreated.value ? (isCreated.value = false) : '';
+};
 
 // 点击卡片
 const allowClicked = (card: any) => {
     // 如果卡片处于编辑状态，则不触发点击事件
     if (!allowClick.value) {
-        return
+        return;
     }
 
     const datas = {
@@ -168,40 +168,40 @@ const allowClicked = (card: any) => {
         account: card.account,
         password: card.password,
         name: card.name
-    }
-    emits('cardClicked', '通知父级')
+    };
+    emits('cardClicked', '通知父级');
 
     // 设置store
-    const configStore = useConfigStore()
-    configStore.setConfig(datas)
+    const configStore = useConfigStore();
+    configStore.setConfig(datas);
 
     base.postMessage({
         type: 'connect',
         content: datas
-    })
-}
+    });
+};
 
 // =======================
 //    传给父级的事件
 // =======================
 const emits = defineEmits<{
-    (event: 'cardClicked', data: any): void
-}>()
+    (event: 'cardClicked', data: any): void;
+}>();
 
 onMounted(() => {
     window.addEventListener('message', (event) => {
-        const message = event.data
+        const message = event.data;
         // console.log('收到消息', message)
         try {
             if (message.type === 'getConfig') {
-                console.log(message.datas)
-                message.datas = JSON.parse(message.datas)
-                const { ip, account } = message.datas
+                console.log(message.datas);
+                message.datas = JSON.parse(message.datas);
+                const { ip, account } = message.datas;
                 if (!ip) {
                     // 创建模式
-                    isCreated.value = true
+                    isCreated.value = true;
                     // 禁止点击卡片
-                    allowClick.value = false
+                    allowClick.value = false;
                     cards.value.push({
                         isEditing: false,
                         title: '',
@@ -210,19 +210,19 @@ onMounted(() => {
                         account: account,
                         password: '',
                         name: ''
-                    })
+                    });
                 } else {
                     // 正常模式
-                    isCreated.value = false
-                    allowClick.value = true
-                    cards.value.push(message.datas)
+                    isCreated.value = false;
+                    allowClick.value = true;
+                    cards.value.push(message.datas);
                 }
             }
         } catch (error) {
-            console.log('error', error)
+            console.log('error', error);
         }
-    })
-})
+    });
+});
 </script>
 
 <style lang="scss" scoped>
@@ -261,5 +261,4 @@ onMounted(() => {
         }
     }
 }
-
 </style>
