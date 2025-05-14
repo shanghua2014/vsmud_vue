@@ -25,9 +25,12 @@ export class xTermLoginc {
     private base: Base;
     private cmdHistory: string[] = [];
     private historyIndex: number = -1;
+    private scrollTop: number = 0;
+    private viewportElement: HTMLElement | null;
 
     constructor() {
         this.base = new Base();
+        this.viewportElement = null;
     }
 
     public termWrite(terminal: any, msg: any) {
@@ -78,22 +81,25 @@ export class xTermLoginc {
     public setupScrollListener(terminalContainer: any, showDownBtn: any, emits: any) {
         let scrollListener: () => void;
         if (terminalContainer.value) {
-            const viewportElement = terminalContainer.value.querySelector('.xterm-viewport') as HTMLElement | null;
-            if (viewportElement) {
+            this.viewportElement = terminalContainer.value.querySelector('.xterm-viewport');
+            const viewEle = this.viewportElement;
+            if (viewEle) {
                 scrollListener = () => {
-                    const scrollTop = viewportElement.scrollTop;
-                    const scrollHeight = viewportElement.scrollHeight;
-                    const clientHeight = viewportElement.clientHeight;
+                    const scrollTop = viewEle.scrollTop;
+                    // 记录滚动位置
+                    this.scrollTop = scrollTop;
+                    const scrollHeight = viewEle.scrollHeight;
+                    const clientHeight = viewEle.clientHeight;
                     // 计算距离底部的距离
                     const distanceToBottom = scrollHeight - scrollTop - clientHeight;
                     showDownBtn.value = distanceToBottom > 10;
                     // 直接触发 emit 事件
                     emits('toggleMenuButton', showDownBtn.value);
                 };
-                viewportElement.addEventListener('scroll', scrollListener);
+                viewEle.addEventListener('scroll', scrollListener);
                 return () => {
-                    if (viewportElement && scrollListener) {
-                        viewportElement.removeEventListener('scroll', scrollListener);
+                    if (viewEle && scrollListener) {
+                        viewEle.removeEventListener('scroll', scrollListener);
                     }
                 };
             }
@@ -119,9 +125,6 @@ export class xTermLoginc {
 
     // 监听事件集合
     public eventListener(terminal: any, inputRef: any, fitAddon: any, ElMessage: any) {
-        // 监听选中内容变化事件
-        terminal.value.onSelectionChange(() => {});
-
         // 监听终端内容变化事件
         terminal.value.onData(() => {
             this.resetLetterSpacing();
@@ -129,7 +132,11 @@ export class xTermLoginc {
         let i = 0;
         if (navigator.userAgent.indexOf('Windows') != -1) {
             terminal.value.onKey((event: KeyboardEvent) => {
-                console.log(event);
+                let currentScrollTop = 0;
+                // 记录当前滚动位置
+                if (this.viewportElement) {
+                    currentScrollTop = this.viewportElement.scrollTop;
+                }
                 switch (event.key) {
                     case '\u0003':
                         // 检测 Ctrl+C 组合键
@@ -154,6 +161,13 @@ export class xTermLoginc {
                         }
                         break;
                 }
+
+                // 延迟 1 秒恢复滚动位置和滚动条
+                setTimeout(() => {
+                    if (this.viewportElement) {
+                        this.viewportElement.scrollTop = currentScrollTop;
+                    }
+                }, 50);
             });
         } else {
             window.addEventListener('keydown', (event: KeyboardEvent) => {

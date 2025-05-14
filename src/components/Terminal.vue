@@ -13,8 +13,8 @@
 import { onMounted, ref, onUnmounted } from 'vue';
 import { ElInput, ElMessage, ElButton } from 'element-plus';
 import { Bottom } from '@element-plus/icons-vue';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
 import { Base, xTermLoginc } from '@/utils/util';
@@ -57,7 +57,6 @@ let isDoubleClick = false;
 onMounted(() => {
     // 创建 xTerm 终端实例
     terminal.value = new Terminal({
-        convertEol: true,
         fontFamily: 'Fira Code, Sarasa Mono SC Nerd, Courier New, monospace',
         fontSize: 14,
         lineHeight: 1.2, // 适当增大行高
@@ -65,9 +64,7 @@ onMounted(() => {
             foreground: '#D3D3D3'
         },
         scrollback: 300, // 限制最大行数为 300 行
-        // 允许使用提议 API
-        allowProposedApi: true,
-        allowTransparency: true
+        allowProposedApi:true,
     });
 
     // 向终端写入欢迎信息
@@ -181,7 +178,7 @@ const sendCommand = (command: string, terminal: any) => {
     const resetColor = '\x1b[0m';
     terminal.value.write(`${greenColor}[ ${command} ]${resetColor}\r\n`, () => {
         inputBox.value = '';
-        scrollToBottom(); // 确保光标在最底部
+        // scrollToBottom(); // 确保光标在最底部
         console.log('命令发送成功');
     });
     const showRegex = /^#show\s{1,3}(.*)/;
@@ -263,5 +260,8 @@ const handleInputFocus = () => {
         bottom: 34px;
         z-index: 10;
     }
+}
+#terminal .xterm-viewport {
+    overflow-y: hidden; /* 允许垂直滚动 */
 }
 </style>
