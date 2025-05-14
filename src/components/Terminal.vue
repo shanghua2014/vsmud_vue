@@ -1,8 +1,8 @@
 <template>
     <!-- 终端容器外层包裹 -->
     <div class="terminal-wrapper">
-        <!-- 用于渲染 xTerm 终端的容器，点击时聚焦输入框 -->
-        <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
+        <!-- 用于渲染 xTerm 终端的容器，点击时聚焦输入框，双击时触发双击处理逻辑 -->
+        <div ref="terminalContainer" class="terminal-container" @click="handlefocus" @dblclick="handleDoubleClick"></div>
         <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" placeholder="命令" ref="inputRef" class="terminal-input" />
         <!-- 向下按钮，根据 showDownBtn 状态显示 -->
         <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button"><Bottom style="width: 1em; height: 1em" /></el-button>
@@ -49,6 +49,8 @@ const emits = defineEmits(['toggleMenuButton']);
 
 let removeScrollListener: () => void;
 let removeAltZListener: () => void;
+// 标记是否为双击操作
+let isDoubleClick = false;
 
 // 组件挂载后执行初始化操作
 onMounted(() => {
@@ -83,6 +85,15 @@ onMounted(() => {
         terminal.value.open(terminalContainer.value);
         fitAddon.fit(); // 调整终端尺寸以适应容器
     }
+
+    // 监听选中内容变化事件
+    terminal.value.onSelectionChange(() => {
+        console.log('选中内容变化:', isDoubleClick);
+        if (isDoubleClick && terminal.value?.getSelection()) {
+            inputRef.value?.focus();
+            isDoubleClick = false;
+        }
+    });
 
     // 为终端添加一系列事件监听器
     logic.eventListener(terminal, inputRef, fitAddon, ElMessage);
@@ -126,7 +137,16 @@ onUnmounted(() => {
  * 点击终端区域时让输入框获得焦点。
  */
 const handlefocus = () => {
+    console.log('点击终端区域');
     inputRef.value?.focus();
+};
+
+/**
+ * 处理双击事件，标记为双击操作。
+ */
+const handleDoubleClick = () => {
+    console.log('双击事件');
+    isDoubleClick = true;
 };
 
 /**
@@ -141,7 +161,7 @@ const handleInput = () => {
             logic.addCommandToHistory(command);
         }
         // 处理用户输入的命令
-        handleCommand(command, terminal);
+        sendCommand(command, terminal);
     }
 };
 
@@ -170,14 +190,27 @@ const handleKeyDown = (event: Event) => {
  * @param command - 用户输入的命令
  * @param terminal - 终端实例
  */
-const handleCommand = (command: string, terminal: any) => {
-    // 向基础服务发送命令
-    base.postMessage({ type: 'command', content: command });
-    // 在终端显示命令并清空输入框，滚动到终端底部
-    terminal.value.write(`[ ${command} ]\r\n`, () => {
+const sendCommand = (command: string, terminal: any) => {
+    // 定义不同颜色的 ANSI 转义序列，这里使用绿色
+    const greenColor = '\x1b[0;40m\x1b[1;32m';
+    const yellowColor = '\x1b[0;40m\x1b[1;33m';
+    const resetColor = '\x1b[0m';
+    terminal.value.write(`${greenColor}[ ${command} ]${resetColor}\r\n`, () => {
         inputBox.value = '';
         scrollToBottom(); // 确保光标在最底部
+        console.log('命令发送成功');
     });
+    const showRegex = /^#show\s{1,3}(.*)/;
+    const match = showRegex.exec(command);
+    if (match) {
+        // 测试触发，不发送服务器请求
+        const parameter = match[1];
+        terminal.value.write(`${yellowColor}${parameter}${resetColor}\r\n`);
+    } else {
+        // 向基础服务发送命令
+        base.postMessage({ type: 'command', content: command });
+        // 在终端显示命令并清空输入框，滚动到终端底部
+    }
 };
 
 /**
@@ -186,6 +219,7 @@ const handleCommand = (command: string, terminal: any) => {
 const scrollToBottom = () => {
     if (terminal.value) {
         terminal.value.scrollToBottom();
+        console.log('滚动到底部');
         // 使用新变量名
         showDownBtn.value = false;
     }

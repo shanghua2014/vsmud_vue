@@ -13,7 +13,7 @@ import MenuButton from './components/MenuButton.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
-const showTerminal = ref(false);
+const showTerminal = ref(location.protocol == 'http:' ? true : false);
 const mudlist = ref<any>({});
 const hideMenuButton = ref(false);
 

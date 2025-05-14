@@ -4,26 +4,28 @@
             <template #title
                 ><el-icon><Document /></el-icon
             ></template>
-            <el-sub-menu index="1-1">
-                <template #title>脚本1</template>
-                <el-menu-item index="1-1-1">重载1</el-menu-item>
+            <el-sub-menu index="2-1">
+                <template #title>账号</template>
+                <el-menu-item index="#reconnect">重连(#rec)</el-menu-item>
             </el-sub-menu>
-            <el-sub-menu index="2-4">
+            <el-sub-menu index="1-1">
                 <template #title>脚本</template>
-                <el-menu-item index="2-4-1">重载</el-menu-item>
+                <el-menu-item index="#reload">重载(#re)</el-menu-item>
             </el-sub-menu>
         </el-sub-menu>
     </el-menu>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
-import { Document } from '@element-plus/icons-vue' // 导入图标组件
+import { ref } from 'vue';
+import { Document } from '@element-plus/icons-vue'; // 导入图标组件
+import { Base } from '../utils/util';
 
-const activeIndex = ref('1')
+const base = new Base();
+const activeIndex = ref('1');
 const handleSelect = (key: string, keyPath: string[]) => {
-    console.log(key, keyPath)
-}
+    base.postMessage({ type: 'command', content: keyPath[2] });
+};
 </script>
 
 <style lang="scss">

@@ -106,6 +106,7 @@ export class xTermLoginc {
         const keyDownListener = (event: KeyboardEvent) => {
             if (event.ctrlKey && event.key.toLowerCase() === 'z') {
                 if (terminal.value) {
+                    console.log('触发了 Alt+Z 组合键');
                     terminal.value.scrollToBottom();
                 }
             }
@@ -180,9 +181,6 @@ export class xTermLoginc {
         // 监听窗口大小变化，动态调整终端尺寸
         window.addEventListener('resize', () => {
             fitAddon.fit();
-            if (terminal.value) {
-                terminal.value.scrollToBottom(); // 确保调整尺寸后光标在最底部
-            }
         });
     }
 
