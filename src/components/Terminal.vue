@@ -2,7 +2,7 @@
     <!-- 终端容器外层包裹 -->
     <div class="terminal-wrapper">
         <!-- 用于渲染 xTerm 终端的容器，点击时聚焦输入框，双击时触发双击处理逻辑 -->
-        <div ref="terminalContainer" class="terminal-container" @click="handlefocus" @dblclick="handleDoubleClick"></div>
+        <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
         <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" placeholder="命令" ref="inputRef" class="terminal-input" />
         <!-- 向下按钮，根据 showDownBtn 状态显示 -->
         <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button"><Bottom style="width: 1em; height: 1em" /></el-button>
@@ -43,6 +43,7 @@ const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
 const terminal = ref<Terminal | null>(null);
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
+const isInputFocused = ref(true); // 输入框是否聚焦
 
 // 定义 emit 事件
 const emits = defineEmits(['toggleMenuButton']);
@@ -71,7 +72,7 @@ onMounted(() => {
 
     // 向终端写入欢迎信息
     for (let i = 0; i < 100; i++) {
-        terminal.value.write(`\r\n`);
+        // terminal.value.write(`\r\n`);
         terminal.value.write(`[ 欢迎使用 xTerm 终端-${i} ]\r\n`);
     }
 
@@ -85,15 +86,6 @@ onMounted(() => {
         terminal.value.open(terminalContainer.value);
         fitAddon.fit(); // 调整终端尺寸以适应容器
     }
-
-    // 监听选中内容变化事件
-    terminal.value.onSelectionChange(() => {
-        console.log('选中内容变化:', isDoubleClick);
-        if (isDoubleClick && terminal.value?.getSelection()) {
-            inputRef.value?.focus();
-            isDoubleClick = false;
-        }
-    });
 
     // 为终端添加一系列事件监听器
     logic.eventListener(terminal, inputRef, fitAddon, ElMessage);
@@ -139,14 +131,6 @@ onUnmounted(() => {
 const handlefocus = () => {
     console.log('点击终端区域');
     inputRef.value?.focus();
-};
-
-/**
- * 处理双击事件，标记为双击操作。
- */
-const handleDoubleClick = () => {
-    console.log('双击事件');
-    isDoubleClick = true;
 };
 
 /**
@@ -223,6 +207,11 @@ const scrollToBottom = () => {
         // 使用新变量名
         showDownBtn.value = false;
     }
+};
+
+// 输入框获得焦点时的处理函数
+const handleInputFocus = () => {
+    isInputFocused.value = true;
 };
 </script>
 

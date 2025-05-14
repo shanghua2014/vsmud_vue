@@ -31,7 +31,7 @@ export class xTermLoginc {
     }
 
     public termWrite(terminal: any, msg: any) {
-        terminal.value.write(`${msg}\r\n`);
+        terminal.value.write(`${msg}`);
         const configStore = useConfigStore();
         if (/((你|您)的英文名)|(人物请输入new。)/.test(msg)) {
             const account = configStore.configInfo?.account.trim();
@@ -119,6 +119,9 @@ export class xTermLoginc {
 
     // 监听事件集合
     public eventListener(terminal: any, inputRef: any, fitAddon: any, ElMessage: any) {
+        // 监听选中内容变化事件
+        terminal.value.onSelectionChange(() => {});
+
         // 监听终端内容变化事件
         terminal.value.onData(() => {
             this.resetLetterSpacing();
@@ -126,6 +129,7 @@ export class xTermLoginc {
         let i = 0;
         if (navigator.userAgent.indexOf('Windows') != -1) {
             terminal.value.onKey((event: KeyboardEvent) => {
+                console.log(event);
                 switch (event.key) {
                     case '\u0003':
                         // 检测 Ctrl+C 组合键
