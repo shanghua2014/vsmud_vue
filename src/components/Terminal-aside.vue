@@ -47,3 +47,9 @@ onMounted(() => {
     }
 });
 </script>
+<style scoped>
+.terminal-wrapper {
+    width: 100%;
+    height: 100px;
+}
+</style>

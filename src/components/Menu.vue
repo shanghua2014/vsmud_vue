@@ -8,13 +8,16 @@
         :collapse="true"
         menu-trigger="hover"
     >
-        <el-sub-menu index="2">
+        <el-sub-menu>
             <template #title
                 ><el-icon><Document /></el-icon
             ></template>
-            <el-sub-menu index="2-1">
+            <el-sub-menu index="3-1">
                 <template #title>账号</template>
                 <el-menu-item index="#reconnect">重连(#rec)</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="2">
+                <template #title>配置</template>
             </el-sub-menu>
             <el-sub-menu index="1-1">
                 <template #title>脚本</template>

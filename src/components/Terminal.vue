@@ -45,7 +45,7 @@ const showDownBtn = ref(false);
 const isInputFocused = ref(true); // 输入框是否聚焦
 
 // 定义 emit 事件
-const emits = defineEmits(['toggleMenuButton']);
+const emits = defineEmits(['toggleMenu']);
 
 let removeScrollListener: () => void;
 let removeAltZListener: () => void;

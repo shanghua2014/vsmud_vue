@@ -2,8 +2,8 @@
     <div class="common-layout">
         <el-container>
             <el-main class="pr">
-                <MenuButton v-if="!hideMenuButton" />
-                <Terminal v-if="showTerminal" @toggleMenuButton="handleToggleMenuButton" />
+                <Menu v-if="!hideMenu" />
+                <Terminal v-if="showTerminal" @toggleMenu="handleToggleMenu" />
                 <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
             </el-main>
             <el-aside style="width: 28%">
@@ -12,8 +12,8 @@
         </el-container>
     </div>
     <!-- <div class="app-container">
-        <MenuButton v-if="!hideMenuButton" />
-        <Terminal v-if="showTerminal" @toggleMenuButton="handleToggleMenuButton" />
+        <Menu v-if="!hideMenu" />
+        <Terminal v-if="showTerminal" @toggleMenu="handleToggleMenu" />
         <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
     </div> -->
 </template>
@@ -21,14 +21,14 @@
 <script lang="ts" setup>
 import Terminal from './components/Terminal.vue';
 import Mudlist from './components/MudList.vue';
-import MenuButton from './components/MenuButton.vue';
+import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
 const showTerminal = ref(location.protocol == 'http:' ? true : false);
 const mudlist = ref<any>({});
-const hideMenuButton = ref(false);
+const hideMenu = ref(false);
 
 // =======================
 //    接收子组件的消息
@@ -39,9 +39,9 @@ const receive = {
     }
 };
 
-// 处理 Terminal 组件的 toggleMenuButton 事件
-const handleToggleMenuButton = (shouldHide: boolean) => {
-    hideMenuButton.value = shouldHide;
+// 处理 Terminal 组件的 toggleMenu 事件
+const handleToggleMenu = (shouldHide: boolean) => {
+    hideMenu.value = shouldHide;
 };
 
 // 接收来自vscode扩展的消息
