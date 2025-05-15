@@ -108,9 +108,9 @@ export class xTermLoginc {
     }
 
     // 监听 Alt+Z 组合键
-    public setupAltZListener(terminal: any) {
+    private setupAltZListener(terminal: any) {
         const keyDownListener = (event: KeyboardEvent) => {
-            if (event.ctrlKey && event.key.toLowerCase() === 'z') {
+            if (event.altKey && event.key.toLowerCase() === 'z') {
                 if (terminal.value) {
                     console.log('触发了 Alt+Z 组合键');
                     terminal.value.scrollToBottom();
@@ -123,12 +123,33 @@ export class xTermLoginc {
         };
     }
 
+    private copyText(terminal: any, inputRef: any, ElMessage: any) {
+        navigator.clipboard
+            .writeText(terminal.value.getSelection())
+            .then(() => {
+                ElMessage({
+                    message: '复制成功',
+                    type: 'success',
+                    plain: true
+                });
+                inputRef.value?.focus();
+            })
+            .catch((err) => {
+                console.error('复制失败:', err);
+            });
+    }
+
     // 监听事件集合
     public eventListener(terminal: any, inputRef: any, fitAddon: any, ElMessage: any) {
         // 监听终端内容变化事件
         terminal.value.onData(() => {
             this.resetLetterSpacing();
         });
+
+        // 监听 Alt+Z 组合键
+        this.setupAltZListener(terminal);
+
+        // 监听键盘事件
         let i = 0;
         if (navigator.userAgent.indexOf('Windows') != -1) {
             terminal.value.onKey((event: KeyboardEvent) => {
@@ -141,23 +162,11 @@ export class xTermLoginc {
                     case '\u0003':
                         // 检测 Ctrl+C 组合键
                         if (terminal.value && i === 0) {
-                            navigator.clipboard
-                                .writeText(terminal.value.getSelection())
-                                .then(() => {
-                                    ElMessage({
-                                        message: '复制成功',
-                                        type: 'success',
-                                        plain: true
-                                    });
-                                    inputRef.value?.focus();
-                                    setTimeout(() => {
-                                        i = 0;
-                                    }, 1000);
-                                })
-                                .catch((err) => {
-                                    console.error('复制失败:', err);
-                                });
+                            setTimeout(() => {
+                                i = 0;
+                            }, 1000);
                             i++;
+                            this.copyText(terminal, inputRef, ElMessage);
                         }
                         break;
                 }
@@ -173,24 +182,12 @@ export class xTermLoginc {
             window.addEventListener('keydown', (event: KeyboardEvent) => {
                 if (event.metaKey && event.key.toLowerCase() === 'c') {
                     // 检测 cmd+C 组合键
-                    if (terminal.value && i == 0) {
-                        navigator.clipboard
-                            .writeText(terminal.value.getSelection())
-                            .then(() => {
-                                ElMessage({
-                                    message: '复制成功',
-                                    type: 'success',
-                                    plain: true
-                                });
-                                inputRef.value?.focus();
-                                setTimeout(() => {
-                                    i = 0;
-                                }, 1000);
-                            })
-                            .catch((err) => {
-                                console.error('复制失败:', err);
-                            });
+                    if (terminal.value && i === 0) {
+                        setTimeout(() => {
+                            i = 0;
+                        }, 1000);
                         i++;
+                        this.copyText(terminal, inputRef, ElMessage);
                     }
                 }
             });

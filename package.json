@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "build": "webpack",
+        "build": "vite build",
         "serve": "vite",
         "dev": "webpack --config webpack.dev.js --mode development"
     },

@@ -1,5 +1,13 @@
 <template>
-    <el-menu :default-active="activeIndex" class="el-menu-demo pa" mode="horizontal" :ellipsis="false" @select="handleSelect" :collapse="true">
+    <el-menu
+        :default-active="activeIndex"
+        class="el-menu-demo pa"
+        mode="horizontal"
+        :ellipsis="false"
+        @select="handleSelect"
+        :collapse="true"
+        menu-trigger="hover"
+    >
         <el-sub-menu index="2">
             <template #title
                 ><el-icon><Document /></el-icon
@@ -22,7 +30,7 @@ import { Document } from '@element-plus/icons-vue'; // 导入图标组件
 import { Base } from '../utils/util';
 
 const base = new Base();
-const activeIndex = ref('1');
+const activeIndex = ref(1);
 const handleSelect = (key: string, keyPath: string[]) => {
     base.postMessage({ type: 'command', content: keyPath[2] });
 };
@@ -33,7 +41,7 @@ ul.el-menu-demo {
     height: 30px;
     width: 60px;
     bottom: 34px;
-    right: 3px;
+    right: 0;
     background: #1f1f1f;
     border: 1px solid var(--el-menu-border-color);
     justify-content: center;
@@ -51,8 +59,13 @@ div.el-menu--horizontal .el-menu .el-sub-menu__title {
     padding: 0;
     width: 90px;
 }
+// 从左侧偏移
 div.el-popper.is-pure:first-child {
-    inset: auto 0 70px auto !important;
+    transform: translateX(-31px) !important;
+}
+.el-popper.is-pure.el-tooltip {
+    transform: translateX(-192px) !important;
+    min-width: 90px;
 }
 .el-menu--horizontal > .el-menu-item:nth-child(1) {
     margin-right: auto;

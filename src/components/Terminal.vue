@@ -1,11 +1,10 @@
 <template>
-    <!-- 终端容器外层包裹 -->
     <div class="terminal-wrapper">
-        <!-- 用于渲染 xTerm 终端的容器，点击时聚焦输入框，双击时触发双击处理逻辑 -->
         <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
         <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" placeholder="命令" ref="inputRef" class="terminal-input" />
-        <!-- 向下按钮，根据 showDownBtn 状态显示 -->
-        <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button"><Bottom style="width: 1em; height: 1em" /></el-button>
+        <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button" title="置底(alt+z)">
+            <Bottom style="width: 1em; height: 1em" />
+        </el-button>
     </div>
 </template>
 
@@ -15,7 +14,7 @@ import { ElInput, ElMessage, ElButton } from 'element-plus';
 import { Bottom } from '@element-plus/icons-vue';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import '@xterm/xterm/css/xterm.css';
+import 'xterm/css/xterm.css';
 
 import { Base, xTermLoginc } from '@/utils/util';
 
@@ -27,7 +26,7 @@ declare global {
         };
     }
 }
-
+const visible = ref(false);
 // 创建 xTerm 终端逻辑处理实例
 const logic = new xTermLoginc();
 // 创建基础服务实例
@@ -35,12 +34,12 @@ const base = new Base();
 
 // 使用 ref 获取终端容器 DOM 元素
 const terminalContainer = ref<HTMLDivElement | null>(null);
+// 终端实例引用
+const terminal = ref<Terminal | null>(null);
 // 输入框内容
 const inputBox = ref('');
 // 输入框组件引用
 const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
-// 终端实例引用
-const terminal = ref<Terminal | null>(null);
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
 const isInputFocused = ref(true); // 输入框是否聚焦
@@ -64,7 +63,7 @@ onMounted(() => {
             foreground: '#D3D3D3'
         },
         scrollback: 300, // 限制最大行数为 300 行
-        allowProposedApi:true,
+        allowProposedApi: true
     });
 
     // 向终端写入欢迎信息
@@ -88,7 +87,7 @@ onMounted(() => {
     logic.eventListener(terminal, inputRef, fitAddon, ElMessage);
 
     // 聚焦到输入框
-    inputRef.value?.focus();
+    handlefocus();
 
     // 监听来自 vscode 扩展的消息
     window.addEventListener('message', (event) => {
@@ -111,9 +110,6 @@ onMounted(() => {
 
     // 调用封装的滚动监听方法
     removeScrollListener = logic.setupScrollListener(terminalContainer, showDownBtn, emits);
-
-    // 调用封装的 Alt+Z 监听方法
-    removeAltZListener = logic.setupAltZListener(terminal);
 });
 
 // 组件卸载时移除监听器
@@ -126,7 +122,6 @@ onUnmounted(() => {
  * 点击终端区域时让输入框获得焦点。
  */
 const handlefocus = () => {
-    console.log('点击终端区域');
     inputRef.value?.focus();
 };
 
@@ -178,7 +173,7 @@ const sendCommand = (command: string, terminal: any) => {
     const resetColor = '\x1b[0m';
     terminal.value.write(`${greenColor}[ ${command} ]${resetColor}\r\n`, () => {
         inputBox.value = '';
-        // scrollToBottom(); // 确保光标在最底部
+        scrollToBottom(); // 确保光标在最底部
         console.log('命令发送成功');
     });
     const showRegex = /^#show\s{1,3}(.*)/;
@@ -216,8 +211,8 @@ const handleInputFocus = () => {
 .terminal-wrapper {
     display: flex;
     flex-direction: column;
+    width: 100%; /* 占满整个视口宽度 */
     height: 100vh; /* 占满整个视口高度 */
-    width: 100vw; /* 占满整个视口宽度 */
     overflow: hidden;
     position: relative;
     .terminal-container {
@@ -240,8 +235,8 @@ const handleInputFocus = () => {
                 box-sizing: border-box;
             }
             span {
-                // 强制设置 letter-spacing 为 normal
                 letter-spacing: normal !important;
+                white-space: pre-wrap !important;
                 font-weight: 400;
             }
             span.xterm-cursor.xterm-cursor-outline,
@@ -256,12 +251,9 @@ const handleInputFocus = () => {
 
     .down-button {
         position: absolute;
-        right: 5px;
+        right: 0;
         bottom: 34px;
         z-index: 10;
     }
-}
-#terminal .xterm-viewport {
-    overflow-y: hidden; /* 允许垂直滚动 */
 }
 </style>
