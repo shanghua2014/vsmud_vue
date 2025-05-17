@@ -3,7 +3,7 @@
         <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
         <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" placeholder="命令" ref="inputRef" class="terminal-input" />
         <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button" title="置底(alt+z)">
-            <Bottom style="width: 1em; height: 1em" />
+            <Bottom style="width: 31px; height: 1rem;" />
         </el-button>
     </div>
 </template>
@@ -247,6 +247,9 @@ onUnmounted(() => {
     .terminal-input {
         width: 100%; /* 输入框宽度占满 */
         box-sizing: border-box;
+        position:relative;
+        z-index: 3;
+        background:#141414;
     }
 
     div.xterm {
@@ -272,9 +275,13 @@ onUnmounted(() => {
 
     .down-button {
         position: absolute;
-        right: 0;
-        bottom: 34px;
-        z-index: 10;
+        right: 1px;
+        bottom: 29px;
+        z-index: 1;
+        padding:8px 14px;
+        background: #1f1f1f;
+    border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+
     }
 }
 </style>

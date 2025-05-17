@@ -1,11 +1,17 @@
 <template>
-    <div class="common-layout">
+    <div class="common-layout pr">
         <el-container>
             <el-main class="pr">
                 <!-- 使用简化后的方法名 -->
                 <Menu v-if="!hideMenu" :cmd="menuCmd" @checkboxChange="onCheckboxChange" @cancelSelection="onCancel" @confirmSelection="onConfirm" />
                 <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" />
                 <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
+                <div class="status pa flex">
+                    <div>1111</div>
+                    <div>2222</div>
+                    <div>3333</div>
+                    <div>4444</div>
+                </div>
             </el-main>
             <el-aside style="width: 28%">
                 <Channel :selectedCategories="selectedCategories" />
@@ -72,6 +78,14 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.status {
+    width: calc(100% - 64px);
+    background: #000;
+    bottom: 34px;
+    left: 0;
+    color:#fff;
+    font-size: 14px;
+}
 .app-container {
     position: relative;
     height: 100vh;

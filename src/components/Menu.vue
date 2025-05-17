@@ -136,7 +136,7 @@ const listCategory = [
 ];
 
 // 抽屉组件的显示控制
-const openSetting = ref(true);
+const openSetting = ref(false);
 const direction = ref<DrawerProps['direction']>('ttb');
 
 onMounted(() => {
@@ -222,12 +222,13 @@ watch(
 ul.el-menu-demo {
     height: 30px;
     width: 60px;
-    bottom: 34px;
-    right: 0;
+    bottom: 31px;
+    right: 1px;
     background: #1f1f1f;
     border: 1px solid var(--el-menu-border-color);
     justify-content: center;
     z-index: 1;
+    border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
 }
 ul.el-menu--popup {
     padding: 0;
