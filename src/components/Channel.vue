@@ -1,26 +1,33 @@
 <template>
     <div ref="channelsRef" class="channels" style="font-size: 14px">
-        <!-- 根据 divCount 动态渲染 div 并动态绑定 class -->
-        <div v-for="(item, index) in divHeights" :key="index" :style="{ height: item + 'px' }" :class="[getDivClass(form.category[index])]">
+        <!-- 根据 selectedCategories 动态渲染 div 并动态绑定 class -->
+        <div v-for="(item, index) in divHeights" :key="index" :style="{ height: item + 'px' }" :class="[getDivClass(selectedCategories[index])]">
             <el-scrollbar>
                 <el-watermark :font="font" :content="['vsmud', '北侠-shanghua']" :rotate="-30" :gap="[50, 60]">
                     <div style="" />
-                    <p v-for="num in ps">{{ num }}</p>
+                    <p v-for="(num, i) in ps">{{ num }}</p>
                 </el-watermark>
             </el-scrollbar>
         </div>
-        <!-- 使用 @change 事件绑定 handleSelected 函数 -->
-        <el-checkbox-group v-model="form.category" size="small" class="config flex" @change="handleSelected">
-            <el-checkbox v-for="item in listCategory" border :value="item.value" :label="item.label">{{ item.label }}</el-checkbox>
-        </el-checkbox-group>
+        <div class="config">
+            111<br />
+            111<br />
+            111<br />
+            111<br />
+            111<br />
+            111<br />
+        </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, nextTick, reactive, watch } from 'vue';
-import { ElInput, ElMessage, ElButton } from 'element-plus';
-import TerminalAside from './Terminal-aside.vue';
+import { onMounted, ref, nextTick, reactive, watch, defineProps } from 'vue';
+// 定义 props 接收选中的 checkbox 值
+const props = defineProps<{
+    selectedCategories: string[];
+}>();
 
+const ps = ref([1, 2, 3, 4, 5, 67, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
 // <!-- 水印 -->
 const font = reactive({
     color: 'rgba(255,255,255, .15)'
@@ -30,31 +37,8 @@ const font = reactive({
 const channelsRef = ref<HTMLElement | null>(null);
 // 存储每个 div 的高度
 const divHeights = ref<number[]>([]);
-
-const qq = ref(false);
-const newbie = ref(false);
-const chat = ref(false);
-const rumor = ref(false);
-
-const form = ref({
-    // 初始化时添加 'chat' 让闲聊选项默认选中
-    category: ['chat'] as string[]
-});
-const ps = ref([1, 2, 3, 4, 5, 67, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
-
-const listCategory = [
-    { value: 'qq', label: 'QQ' },
-    { value: 'newbie', label: '新手' },
-    { value: 'chat', label: '闲聊' },
-    { value: 'rumor', label: '谣言' },
-    { value: 'hood', label: '江湖' },
-    { value: 'help', label: '求助' },
-    { value: 'family', label: '门派' },
-    { value: 'task', label: '任务/保卫' }
-];
-
-// 定义 div 的数量，使用 const 声明
-const divCount = ref(0);
+// 存储初始 divHeights
+const initialDivHeights = ref<number[]>([]);
 
 // 定义根据选中项返回对应 class 的函数
 const getDivClass = (selectedValue: string) => {
@@ -75,31 +59,41 @@ const getDivClass = (selectedValue: string) => {
     }
 };
 
-// 定义 handleSelected 函数
-const handleSelected = (value: string[]) => {
-    divCount.value = value.length;
-    console.log('Selected values:', value);
-    updateDivHeights();
-};
-
-// 更新 div 高度的函数
-const updateDivHeights = () => {
+// 简化方法名
+const updateHeights = () => {
     nextTick(() => {
         if (channelsRef.value) {
             const channelsHeight = channelsRef.value.offsetHeight;
             const checkBoxGroup = channelsRef.value.querySelector('.config') as HTMLElement;
             const checkBoxGroupHeight = checkBoxGroup ? checkBoxGroup.offsetHeight : 0;
             const remainingHeight = channelsHeight - checkBoxGroupHeight;
-            const singleDivHeight = divCount.value > 0 ? remainingHeight / divCount.value : 0;
-            divHeights.value = Array(divCount.value).fill(singleDivHeight);
+            const singleDivHeight = props.selectedCategories.length > 0 ? remainingHeight / props.selectedCategories.length : 0;
+            divHeights.value = Array(props.selectedCategories.length).fill(singleDivHeight);
         }
     });
 };
 
+// 监听 selectedCategories 的变化
+watch(
+    () => props.selectedCategories,
+    (newValue, oldValue) => {
+        if (oldValue && newValue.length > oldValue.length) {
+            // 存储初始 divHeights
+            initialDivHeights.value = [...divHeights.value];
+        } else if (oldValue && newValue.length < oldValue.length) {
+            // 当取消选择时，恢复到之前状态
+            divHeights.value = [...initialDivHeights.value];
+        }
+        updateHeights();
+    },
+    { deep: true, immediate: true }
+);
+
 onMounted(() => {
-    // 初始化时设置 divCount 为默认选中项数量
-    divCount.value = form.value.category.length;
-    updateDivHeights();
+    // 使用简化后的方法名
+    updateHeights();
+    // 初始化存储初始 divHeights
+    initialDivHeights.value = [...divHeights.value];
 });
 </script>
 
@@ -139,9 +133,6 @@ $help-shadow-color: var(--el-color-success);
         padding: 10px 0 0 10px;
         flex-direction: row;
         box-sizing: border-box;
-        label {
-            margin-bottom: 10px;
-        }
     }
 
     .cyan-line {

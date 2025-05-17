@@ -77,7 +77,7 @@ export class xTermLoginc {
         });
     }
 
-    // 监听滚动事件并触发 toggleMenu 事件
+    // 监听滚动事件并触发 showDownward 事件
     public setupScrollListener(terminalContainer: any, showDownBtn: any, emits: any) {
         let scrollListener: () => void;
         if (terminalContainer.value) {
@@ -94,7 +94,7 @@ export class xTermLoginc {
                     const distanceToBottom = scrollHeight - scrollTop - clientHeight;
                     showDownBtn.value = distanceToBottom > 10;
                     // 直接触发 emit 事件
-                    emits('toggleMenu', showDownBtn.value);
+                    emits('showDownward', showDownBtn.value);
                 };
                 viewEle.addEventListener('scroll', scrollListener);
                 return () => {
@@ -123,6 +123,7 @@ export class xTermLoginc {
         };
     }
 
+    // 复制文本
     private copyText(terminal: any, inputRef: any, ElMessage: any) {
         navigator.clipboard
             .writeText(terminal.value.getSelection())

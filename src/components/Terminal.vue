@@ -26,7 +26,7 @@ declare global {
         };
     }
 }
-const visible = ref(false);
+
 // 创建 xTerm 终端逻辑处理实例
 const logic = new xTermLoginc();
 // 创建基础服务实例
@@ -42,15 +42,11 @@ const inputBox = ref('');
 const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
-const isInputFocused = ref(true); // 输入框是否聚焦
 
-// 定义 emit 事件
-const emits = defineEmits(['toggleMenu']);
+// 定义 emit 事件，添加新事件 notifyParent
+const emits = defineEmits(['showDownward', 'menuCommand']);
 
 let removeScrollListener: () => void;
-let removeAltZListener: () => void;
-// 标记是否为双击操作
-let isDoubleClick = false;
 
 // 组件挂载后执行初始化操作
 onMounted(() => {
@@ -112,12 +108,6 @@ onMounted(() => {
     removeScrollListener = logic.setupScrollListener(terminalContainer, showDownBtn, emits);
 });
 
-// 组件卸载时移除监听器
-onUnmounted(() => {
-    removeScrollListener();
-    removeAltZListener();
-});
-
 /**
  * 点击终端区域时让输入框获得焦点。
  */
@@ -172,17 +162,48 @@ const sendCommand = (command: string, terminal: any) => {
     const yellowColor = '\x1b[0;40m\x1b[1;33m';
     const resetColor = '\x1b[0m';
     terminal.value.write(`${greenColor}[ ${command} ]${resetColor}\r\n`, () => {
-        inputBox.value = '';
+        // 全选输入框中的内容
+        if (inputRef.value) {
+            const inputElement = inputRef.value.$el.querySelector('input') as HTMLInputElement;
+            if (inputElement) {
+                inputElement.select();
+            }
+        }
         scrollToBottom(); // 确保光标在最底部
-        console.log('命令发送成功');
     });
-    const showRegex = /^#show\s{1,3}(.*)/;
-    const match = showRegex.exec(command);
-    if (match) {
-        // 测试触发，不发送服务器请求
-        const parameter = match[1];
-        terminal.value.write(`${yellowColor}${parameter}${resetColor}\r\n`);
-    } else {
+
+    // 定义可替换的关键字数组，使用 as const 声明为只读元组
+    const keywords = ['show', 'set'] as const;
+    // 定义关键字对应的处理函数对象
+    const keywordHandlers = {
+        show: (terminal: any, cmd: string) => {
+            terminal.value.write(`${yellowColor}${cmd}${resetColor}\r\n`);
+        },
+        set: (terminal: any, cmd: string) => {
+            console.log(cmd);
+            emits('menuCommand', { command: cmd });
+        }
+    };
+    let isMatched = false;
+
+    // 使用 for 循环遍历，明确 keyword 的类型
+    for (const keyword of keywords) {
+        // 使用 RegExp 构造函数创建动态正则表达式
+        const showRegex = new RegExp(`^#${keyword}\\s?(.*)*`);
+        const match = showRegex.exec(command);
+        if (match) {
+            isMatched = true;
+            // 测试触发，不发送服务器请求
+            const cmd = match[1];
+            if (keywordHandlers[keyword]) {
+                // 唤起前端界面，用match['input']
+                // 后端命令用cmd
+                keywordHandlers[keyword](terminal, cmd == undefined ? match['input'] : cmd);
+            }
+        }
+    }
+
+    if (!isMatched) {
         // 向基础服务发送命令
         base.postMessage({ type: 'command', content: command });
         // 在终端显示命令并清空输入框，滚动到终端底部
@@ -201,10 +222,10 @@ const scrollToBottom = () => {
     }
 };
 
-// 输入框获得焦点时的处理函数
-const handleInputFocus = () => {
-    isInputFocused.value = true;
-};
+// 组件卸载时移除监听器
+onUnmounted(() => {
+    removeScrollListener();
+});
 </script>
 
 <style lang="scss">

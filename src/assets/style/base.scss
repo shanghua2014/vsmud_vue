@@ -3,8 +3,8 @@ body,
 #app,
 #terminal-container,
 .terminal-container {
-    height: 100%;
-    width: 100%;
+    height: 100% !important;
+    width: 100% !important;
 }
 html,
 body {
@@ -36,6 +36,9 @@ body {
 }
 .pa {
     position: absolute;
+}
+.flex {
+    display: flex;
 }
 .flex-column {
     flex-direction: column;
