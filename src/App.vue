@@ -6,12 +6,7 @@
                 <Menu v-if="!hideMenu" :cmd="menuCmd" @checkboxChange="onCheckboxChange" @cancelSelection="onCancel" @confirmSelection="onConfirm" />
                 <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" />
                 <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
-                <div class="status pa flex">
-                    <div>1111</div>
-                    <div>2222</div>
-                    <div>3333</div>
-                    <div>4444</div>
-                </div>
+                <Status />
             </el-main>
             <el-aside style="width: 28%">
                 <Channel :selectedCategories="selectedCategories" />
@@ -25,6 +20,7 @@ import Terminal from './components/Terminal.vue';
 import Mudlist from './components/MudList.vue';
 import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
+import Status from './components/Status.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
@@ -78,14 +74,6 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.status {
-    width: calc(100% - 64px);
-    background: #000;
-    bottom: 34px;
-    left: 0;
-    color:#fff;
-    font-size: 14px;
-}
 .app-container {
     position: relative;
     height: 100vh;
