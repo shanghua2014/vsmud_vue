@@ -24,27 +24,76 @@
             <div class="debuff">buff3</div>
         </div>
 
-        <div class="foe pa flex">
+        <div class="foe pa flex" v-if="fighting">
             <el-progress :text-inside="true" :percentage="70" status="exception" />
             <div>
                 [<span><b>怪物名字</b></span
                 >]
             </div>
             <div class="flex buffs">
-                <div>buff1</div>
-                <div>buff2</div>
+                <div>力大无穷</div>
+                <div>气把山河</div>
                 <div class="debuff">buff3</div>
+            </div>
+        </div>
+        <div class="fullme-cd pa">
+            <div class="flex" style="display: none">
+                <el-icon><Clock /></el-icon><span>&nbsp;{{ countdown }}&nbsp;S</span>
+            </div>
+            <div class="fm flex">
+                <el-icon><Pointer /></el-icon><span>Fullme</span>
             </div>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
-const top = ref('red');
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Clock, Pointer } from '@element-plus/icons-vue';
+
+// 初始化倒计时时间，单位：秒
+const countdown = ref(123);
+let timer: any;
+const fighting = ref(false);
+
+// 开始倒计时
+const startCountdown = () => {
+    timer = setInterval(() => {
+        if (countdown.value > 0) {
+            countdown.value--;
+        } else {
+            clearInterval(timer!);
+        }
+    }, 1000);
+};
+
+onMounted(() => {
+    startCountdown();
+});
+
+onUnmounted(() => {
+    if (timer) {
+        clearInterval(timer);
+    }
+});
 </script>
 
 <style lang="scss" scoped>
+.fullme-cd {
+    bottom: -32px;
+    right: -62px;
+    padding: 5px 5px;
+    background-color: #fff;
+    color: #000;
+    z-index: 3;
+    border-radius: 0 var(--el-input-border-radius, var(--el-border-radius-base)) var(--el-input-border-radius, var(--el-border-radius-base)) 0;
+    > div {
+        align-items: center;
+    }
+    .fm {
+        cursor: pointer;
+    }
+}
 .status {
     width: calc(100% - 64px);
     background: #000;

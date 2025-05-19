@@ -10,12 +10,13 @@
             </el-scrollbar>
         </div>
         <div class="config">
-            111<br />
-            111<br />
-            111<br />
-            111<br />
-            111<br />
-            111<br />
+            <el-scrollbar class="scripts">
+                <el-checkbox v-model="checked5" label="脚本 1" size="small" />
+                <el-checkbox v-model="checked6" label="脚本 2" size="small" />
+                <el-checkbox v-model="checked7" label="脚本 2" size="small" />
+                <el-checkbox v-model="checked8" label="脚本 2" size="small" />
+            </el-scrollbar>
+            1111
         </div>
     </div>
 </template>
@@ -28,6 +29,13 @@ const props = defineProps<{
 }>();
 
 const ps = ref([1, 2, 3, 4, 5, 67, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
+const checked5 = ref(false);
+const checked6 = ref(false);
+const checked7 = ref(false);
+const checked8 = ref(false);
+const checked9 = ref(false);
+const checked10 = ref(false);
+
 // <!-- 水印 -->
 const font = reactive({
     color: 'rgba(255,255,255, .15)'
@@ -129,10 +137,18 @@ $help-shadow-color: var(--el-color-success);
         overflow: auto;
     }
     .config {
+        height: 130px;
         flex: none;
-        padding: 10px 0 0 10px;
+        padding: 0 0 0 10px;
         flex-direction: row;
         box-sizing: border-box;
+        .scripts {
+            height: 30px;
+        }
+        .el-checkbox.el-checkbox--small {
+            margin-right: 10px;
+            height:20px;
+        }
     }
 
     .cyan-line {

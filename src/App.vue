@@ -7,6 +7,8 @@
                 <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" />
                 <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
                 <Status />
+                <!-- 监听 hideFullme 事件，控制组件显示隐藏 -->
+                <Fullme v-if="showFullme" @hideFullme="hideFullmeComponent" />
             </el-main>
             <el-aside style="width: 28%">
                 <Channel :selectedCategories="selectedCategories" />
@@ -21,14 +23,24 @@ import Mudlist from './components/MudList.vue';
 import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
+import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
+import type { DrawerProps } from 'element-plus';
 
 const showTerminal = ref(location.protocol == 'http:' ? true : false);
 const mudlist = ref<any>({});
 const hideMenu = ref(false);
 const menuCmd = ref('');
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
+
+// 控制 Fullme 组件显示隐藏
+const showFullme = ref(false);
+
+// 隐藏 Fullme 组件的方法
+const hideFullmeComponent = () => {
+    showFullme.value = false;
+};
 
 // =======================
 //    接收子组件的消息

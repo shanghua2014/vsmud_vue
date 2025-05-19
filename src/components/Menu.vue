@@ -6,7 +6,7 @@
         :ellipsis="false"
         @select="handleSelect"
         :collapse="true"
-        menu-trigger="click"
+        menu-trigger="hover"
     >
         <el-sub-menu index="0">
             <template #title>
@@ -26,7 +26,7 @@
             </el-sub-menu>
         </el-sub-menu>
     </el-menu>
-    <el-drawer v-model="openSetting" :direction="direction" :with-header="false" class="pr">
+    <el-drawer v-model="openSetting" :direction="setDirection" :with-header="false" class="pr">
         <template #default>
             <el-row :gutter="20">
                 <el-col :span="10">
@@ -47,7 +47,7 @@
                         <div class="card-sys flex">
                             <div>
                                 字体：
-                                <el-select v-model="value" placeholder="Select" style="width: 100px">
+                                <el-select v-model="fontSize" placeholder="Select" style="width: 100px">
                                     <el-option v-for="(item, i) in options" :key="item.value" :label="item.label" :value="item.value" />
                                 </el-select>
                             </div>
@@ -90,7 +90,7 @@ const family = ref(false);
 const task = ref(false);
 const divCount = ref(0);
 const fontSizeInput = ref(14);
-const value = ref('');
+const fontSize = ref('');
 const options = [
     {
         value: 'Option1',
@@ -137,7 +137,7 @@ const listCategory = [
 
 // 抽屉组件的显示控制
 const openSetting = ref(false);
-const direction = ref<DrawerProps['direction']>('ttb');
+const setDirection = ref<DrawerProps['direction']>('ttb');
 
 onMounted(() => {
     divCount.value = form.value.category.length;
