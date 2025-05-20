@@ -1,0 +1,18 @@
+{
+    "files": ["main.js", "preload.js", "./dist"],
+    "productName": "项目打包后的名称",
+    "extraFiles": ["./videos", "./cvideo"],
+    "directories": {
+        "output": "./buileder"
+    },
+    "win": {
+        "target": "nsis"
+    },
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "perMachine": false,
+        "deleteAppDataOnUninstall": true
+    },
+    "asar": false
+}

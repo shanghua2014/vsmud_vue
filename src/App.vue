@@ -26,7 +26,6 @@ import Status from './components/Status.vue';
 import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
-import type { DrawerProps } from 'element-plus';
 
 const showTerminal = ref(location.protocol == 'http:' ? true : false);
 const mudlist = ref<any>({});

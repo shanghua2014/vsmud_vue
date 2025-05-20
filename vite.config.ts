@@ -5,6 +5,7 @@ import path from 'path'
 
 export default defineConfig({
     plugins: [vue(), vueJsx()],
+    base: './', // 设置基本路径
     resolve: {
         alias: {
             '@': path.resolve(__dirname, 'src') // 设置 `@` 为 `src` 目录的别名

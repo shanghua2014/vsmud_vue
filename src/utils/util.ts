@@ -31,6 +31,7 @@ export class xTermLoginc {
     constructor() {
         this.base = new Base();
         this.viewportElement = null;
+        this.scrollTop = 0;
     }
 
     public termWrite(terminal: any, msg: any) {

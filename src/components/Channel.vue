@@ -16,7 +16,18 @@
                 <el-checkbox v-model="checked7" label="脚本 2" size="small" />
                 <el-checkbox v-model="checked8" label="脚本 2" size="small" />
             </el-scrollbar>
-            1111
+            <div class="info flex">
+                <div>道长：<span class="name">小邓小邓_shanghua</span></div>
+                <div>师承：<span class="master">宋远桥</span></div>
+            </div>
+            <div class="info flex" v-if="false">
+                <div>任务：<span class="big job">诵经</span></div>
+                <div>目标：<span class="big obj">庄子·外篇「下卷」</span></div>
+                <div>地点：<span class="big place">天柱峰下</span></div>
+            </div>
+            <div class="info flex" v-if="false">
+                <div>练功：<span class="big job">武当剑法</span></div>
+            </div>
         </div>
     </div>
 </template>
@@ -147,7 +158,36 @@ $help-shadow-color: var(--el-color-success);
         }
         .el-checkbox.el-checkbox--small {
             margin-right: 10px;
-            height:20px;
+            height: 20px;
+        }
+        .info {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            color: gainsboro;
+            padding-bottom: 3px;
+            div {
+                margin-right: 5px;
+            }
+            .name,
+            .master {
+                color: rgb(132, 187, 132);
+            }
+            .big {
+                font-size: 16px;
+            }
+            .job {
+                color: aqua;
+            }
+            .obj {
+                color: yellow;
+            }
+            .place {
+                color: #E066FF;
+            }
+        }
+        .info:last-child {
+            padding-bottom: 0;
         }
     }
 
