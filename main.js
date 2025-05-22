@@ -1,5 +1,5 @@
 //main.js
-const { app, BrowserWindow, Menu, screen } = require('electron');
+const { app, BrowserWindow, Menu, screen, ipcMain } = require('electron');
 //这里的引入是用的require，在vite里面有个"type": "module",这个配置在electron运行的时候会报错，说不能require 要用import,需要把"type": "module", 删除
 const path = require('path');
 // 是否是生产环境
@@ -10,6 +10,7 @@ Menu.setApplicationMenu(null);
 
 // 主窗口
 let mainWindow;
+let telnetClient;
 
 const createWindow = () => {
     // 创建浏览器窗口
@@ -48,6 +49,35 @@ const createWindow = () => {
     // 如果使用了 nginx 代理，url 改为代理地址
     // mainWindow.loadURL("https://example.com/");
 };
+
+// IPC 监听：渲染进程请求连接 Telnet
+ipcMain.on('telnet-connect', (event, { host, port }) => {
+    telnetClient = net.createConnection({ host, port }, () => {
+        event.sender.send('telnet-status', '连接成功');
+    });
+
+    // 接收 Telnet 服务器数据并转发到渲染进程
+    telnetClient.on('data', (data) => {
+        event.sender.send('telnet-data', data.toString());
+    });
+
+    // 错误处理
+    telnetClient.on('error', (err) => {
+        event.sender.send('telnet-status', `错误：${err.message}`);
+    });
+
+    // 关闭处理
+    telnetClient.on('end', () => {
+        event.sender.send('telnet-status', '连接已关闭');
+    });
+});
+
+// IPC 监听：渲染进程发送数据到 Telnet
+ipcMain.on('telnet-send', (event, data) => {
+    if (telnetClient) {
+        telnetClient.write(data);
+    }
+});
 
 // 在应用准备就绪时调用函数
 app.whenReady().then(() => {
