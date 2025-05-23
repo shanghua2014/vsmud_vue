@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import vueJsx from '@vitejs/plugin-vue-jsx'
-import path from 'path'
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import vueJsx from '@vitejs/plugin-vue-jsx';
+import path from 'path';
 
 export default defineConfig({
     plugins: [vue(), vueJsx()],
@@ -13,7 +13,7 @@ export default defineConfig({
     },
     server: {
         port: 9000, // 开发服务器端口
-        open: true, // 自动打开浏览器
+        open: false, // 自动打开浏览器
         proxy: {
             // 配置代理（如果需要）
             '/api': {
@@ -27,4 +27,4 @@ export default defineConfig({
         outDir: 'dist', // 构建输出目录
         sourcemap: true // 生成 source map 文件
     }
-})
+});

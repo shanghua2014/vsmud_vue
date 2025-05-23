@@ -24,6 +24,10 @@ declare global {
         customParent: {
             postMessage: (message: any) => void;
         };
+        electronAPI: {
+            send: (channel: string, ...args: any[]) => void;
+            on: (channel: string, listener: (...args: any[]) => void) => void;
+        };
     }
 }
 
@@ -54,17 +58,16 @@ onMounted(() => {
     terminal.value = new Terminal({
         fontFamily: 'Fira Code, Sarasa Mono SC Nerd, Courier New, monospace',
         fontSize: 14,
-        lineHeight: 1.2, // 适当增大行高
+        lineHeight: 1.2,
         theme: {
             foreground: '#D3D3D3'
         },
-        scrollback: 300, // 限制最大行数为 300 行
+        scrollback: 300,
         allowProposedApi: true
     });
 
     // 向终端写入欢迎信息
     for (let i = 0; i < 100; i++) {
-        // terminal.value.write(`\r\n`);
         terminal.value.write(`[ 欢迎使用 xTerm 终端-${i} ]\r\n`);
     }
 
@@ -76,7 +79,7 @@ onMounted(() => {
     // 若终端容器元素存在，打开终端并调整尺寸
     if (terminalContainer.value) {
         terminal.value.open(terminalContainer.value);
-        fitAddon.fit(); // 调整终端尺寸以适应容器
+        fitAddon.fit();
     }
 
     // 为终端添加一系列事件监听器
@@ -86,34 +89,54 @@ onMounted(() => {
     handlefocus();
 
     // 监听来自 vscode 扩展的消息
-    window.addEventListener('message', (event) => {
-        // 若协议为 http 则不处理消息
-        if (location.protocol === 'http:') return;
-        const message = event.data;
-        console.log('Vue消息:', message);
-        switch (message.type) {
-            case 'mud':
-                // 处理 mud 消息
-                logic.termWrite(terminal, message.datas);
-                break;
-            case 'cmd':
-                // 处理 mud 消息
-                base.postMessage({ type: 'command', content: message.datas });
-                terminal.value && terminal.value.write('[ ' + message.datas + ' ] \r\n');
-                break;
-        }
-    });
+    // window.addEventListener('message', (event) => {
+    //     // 若协议为 http 则不处理消息
+    //     if (location.protocol === 'http:') return;
+    //     const message = event.data;
+    //     console.log('Vue消息:', message);
+    //     switch (message.type) {
+    //         case 'mud':
+    //             // 处理 mud 消息
+    //             logic.termWrite(terminal, message.datas);
+    //             break;
+    //         case 'cmd':
+    //             // 处理 mud 消息
+    //             base.postMessage({ type: 'command', content: message.datas });
+    //             terminal.value && terminal.value.write('[ ' + message.datas + ' ] \r\n');
+    //             break;
+    //     }
+    // });
 
     // 调用封装的滚动监听方法
     removeScrollListener = logic.setupScrollListener(terminalContainer, showDownBtn, emits);
+
+    // 监听连接成功事件
+    window.electronAPI.on('telnet-connected', () => {
+        ElMessage.success('Telnet 连接成功！');
+    });
+
+    // 监听连接错误事件
+    window.electronAPI.on('telnet-error', (errorMsg: string) => {
+        ElMessage.error(`Telnet 错误：${errorMsg}`);
+    });
+
+    // 监听 Telnet 数据（显示到终端）
+    window.electronAPI.on('telnet-data', (data: any) => {
+        const { content, type } = data;
+        if (terminal.value && type === 'mud') {
+            terminal.value.write(`${data}\r\n`);
+        }
+        if (type === 'client') {
+            sendCommand(content, terminal, type);
+        }
+    });
+
+    // 监听连接断开事件
+    window.electronAPI.on('telnet-disconnected', () => {
+        ElMessage.info('Telnet 连接已断开');
+    });
 });
 
-/**
- * 点击终端区域时让输入框获得焦点。
- */
-const handlefocus = () => {
-    inputRef.value?.focus();
-};
 
 /**
  * 处理输入框的输入，将非空命令添加到历史记录并发送命令。
@@ -128,26 +151,10 @@ const handleInput = () => {
         }
         // 处理用户输入的命令
         sendCommand(command, terminal);
-    }
-};
-
-/**
- * 处理键盘事件，支持 Alt + 上箭头回滚命令和 Alt + 下箭头翻到下一条命令。
- * @param event - 键盘事件对象
- */
-const handleKeyDown = (event: Event) => {
-    // 类型断言为 KeyboardEvent
-    const keyboardEvent = event as KeyboardEvent;
-    if (keyboardEvent.altKey && keyboardEvent.key === 'ArrowUp') {
-        // 调用封装方法回滚到上一条命令
-        const previousCommand = logic.getPreviousCommand();
-        if (previousCommand !== null) {
-            inputBox.value = previousCommand;
-        }
-    } else if (keyboardEvent.altKey && keyboardEvent.key === 'ArrowDown') {
-        // 调用封装方法翻到下一条命令
-        const nextCommand = logic.getNextCommand();
-        inputBox.value = nextCommand;
+        // 发送命令到 Telnet 服务器
+        window.electronAPI.send('telnet-send', command);
+        window.electronAPI.send('mutual', command);
+        inputBox.value = '';
     }
 };
 
@@ -156,12 +163,19 @@ const handleKeyDown = (event: Event) => {
  * @param command - 用户输入的命令
  * @param terminal - 终端实例
  */
-const sendCommand = (command: string, terminal: any) => {
+const sendCommand = (command: string, terminal: any, type?: any) => {
     // 定义不同颜色的 ANSI 转义序列，这里使用绿色
+    const blueColor = '\x1b[0;40m\x1b[1;44m';
     const greenColor = '\x1b[0;40m\x1b[1;32m';
     const yellowColor = '\x1b[0;40m\x1b[1;33m';
     const resetColor = '\x1b[0m';
-    terminal.value.write(`${greenColor}[ ${command} ]${resetColor}\r\n`, () => {
+
+    let cmd = `${greenColor}[ ${command} ]${resetColor}\r\n`;
+    if (type === 'client') {
+        cmd = `${blueColor}${command}${resetColor}\r\n`;
+    }
+
+    terminal.value.write(`${cmd}\r\n`, () => {
         // 全选输入框中的内容
         if (inputRef.value) {
             const inputElement = inputRef.value.$el.querySelector('input') as HTMLInputElement;
@@ -169,7 +183,14 @@ const sendCommand = (command: string, terminal: any) => {
                 inputElement.select();
             }
         }
-        scrollToBottom(); // 确保光标在最底部
+
+        // 确保光标在最底部
+        scrollToBottom();
+
+        if (command === 'telnet') {
+            console.log('连接mud.pkuxkx.net');
+            connectTelnet('mud.pkuxkx.net', 8081);
+        }
     });
 
     // 定义可替换的关键字数组，使用 as const 声明为只读元组
@@ -205,8 +226,27 @@ const sendCommand = (command: string, terminal: any) => {
 
     if (!isMatched) {
         // 向基础服务发送命令
-        base.postMessage({ type: 'command', content: command });
-        // 在终端显示命令并清空输入框，滚动到终端底部
+        // base.postMessage({ type: 'command', content: command });
+    }
+};
+
+/**
+ * 处理键盘事件，支持 Alt + 上箭头回滚命令和 Alt + 下箭头翻到下一条命令。
+ * @param event - 键盘事件对象
+ */
+const handleKeyDown = (event: Event) => {
+    // 类型断言为 KeyboardEvent
+    const keyboardEvent = event as KeyboardEvent;
+    if (keyboardEvent.altKey && keyboardEvent.key === 'ArrowUp') {
+        // 调用封装方法回滚到上一条命令
+        const previousCommand = logic.getPreviousCommand();
+        if (previousCommand !== null) {
+            inputBox.value = previousCommand;
+        }
+    } else if (keyboardEvent.altKey && keyboardEvent.key === 'ArrowDown') {
+        // 调用封装方法翻到下一条命令
+        const nextCommand = logic.getNextCommand();
+        inputBox.value = nextCommand;
     }
 };
 
@@ -216,15 +256,34 @@ const sendCommand = (command: string, terminal: any) => {
 const scrollToBottom = () => {
     if (terminal.value) {
         terminal.value.scrollToBottom();
-        console.log('滚动到底部');
         // 使用新变量名
         showDownBtn.value = false;
     }
 };
 
+
+/**
+ * 点击终端区域时让输入框获得焦点。
+ */
+ const handlefocus = () => {
+    inputRef.value?.focus();
+};
+
+// 连接 Telnet 服务器
+const connectTelnet = (host: string, port: number) => {
+    window.electronAPI.send('telnet-connect', { host, port });
+};
+
+// 断开 Telnet 连接
+const disconnectTelnet = () => {
+    window.electronAPI.send('telnet-disconnect');
+};
+
 // 组件卸载时移除监听器
 onUnmounted(() => {
     removeScrollListener();
+    // 组件卸载时断开 Telnet 连接
+    disconnectTelnet();
 });
 </script>
 
@@ -232,20 +291,20 @@ onUnmounted(() => {
 .terminal-wrapper {
     display: flex;
     flex-direction: column;
-    width: 100%; /* 占满整个视口宽度 */
-    height: 100vh; /* 占满整个视口高度 */
+    width: 100%;
+    height: 100vh;
     overflow: hidden;
     position: relative;
     .terminal-container {
-        flex: 1; /* 让终端容器占据剩余空间 */
-        width: 100%; /* 宽度占满 */
+        flex: 1;
+        width: 100%;
         // 确保没有额外的 margin 和 padding
         margin: 0;
         padding: 0;
     }
 
     .terminal-input {
-        width: 100%; /* 输入框宽度占满 */
+        width: 100%;
         box-sizing: border-box;
         position: relative;
         z-index: 3;
@@ -269,7 +328,7 @@ onUnmounted(() => {
             }
         }
         .xterm-viewport {
-            overflow-y: hidden; /* 允许垂直滚动 */
+            overflow-y: hidden;
         }
     }
 

@@ -2,19 +2,18 @@
     "name": "webpack_vue",
     "version": "0.1.0",
     "private": true,
-    "main": "main.js",
+    "main": "electron-main.js",
     "scripts": {
         "build": "vite build",
         "serve": "vite",
         "dev": "webpack --config webpack.dev.js --mode development",
         "ele:dev": "electron .",
-        "ele:build": "vite build & electron-builder --config electron.config.json"
+        "ele:build": "vite build & electron-builder --config ./electron/electron.config.json"
     },
     "dependencies": {
         "@types/lodash": "^4.14.182",
         "core-js": "^3.8.3",
         "lodash": "^4.17.21",
-        "telnet-client": "^2.2.5",
         "vue": "^3.2.13"
     },
     "devDependencies": {

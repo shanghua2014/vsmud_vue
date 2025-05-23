@@ -27,7 +27,7 @@ import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
-const showTerminal = ref(location.protocol == 'http:' ? true : false);
+const showTerminal = ref(true);
 const mudlist = ref<any>({});
 const hideMenu = ref(false);
 const menuCmd = ref('');
@@ -75,7 +75,7 @@ const onConfirm = (value: string[]) => {
 
 // 接收来自vscode扩展的消息
 onMounted(() => {
-    new Base().postMessage({ type: 'getAccount', content: '' });
+    // new Base().postMessage({ type: 'getAccount', content: '' });
 });
 
 // 组件卸载时断开观察器

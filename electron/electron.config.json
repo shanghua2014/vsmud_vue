@@ -1,6 +1,6 @@
 {
-    "files": ["main.js", "preload.js", "./dist"],
-    "productName": "项目打包后的名称",
+    "files": ["electron-main.js", "./dist","./electron/**/*"],
+    "productName": "ele-vue",
     "extraFiles": ["./videos", "./cvideo"],
     "directories": {
         "output": "./buileder"

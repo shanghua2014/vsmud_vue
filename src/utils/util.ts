@@ -16,7 +16,7 @@ declare global {
 // 公共类库
 export class Base {
     public postMessage(msg: Message) {
-        location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, content: msg.content });
+        // location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, content: msg.content });
     }
 }
 
