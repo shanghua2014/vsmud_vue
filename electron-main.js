@@ -31,7 +31,7 @@ const createWindow = () => {
             preload: path.join(__dirname, './electron/electron-preload.js'),
             nodeIntegration: false, //开启true这一步很重要,目的是为了vue文件中可以引入node和electron相关的API
             contextIsolation: true, // 可以使用require方法
-            enableRemoteModule: true // 可以使用remote方法
+            enableRemoteModule: true, // 可以使用remote方法
         }
     });
 

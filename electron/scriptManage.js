@@ -7,7 +7,7 @@ const loadedMods = new Set();
 
 export const scriptManage = {
     mutual: (mainWindow) => {
-        ipcMain.on('mutual', async (event, cmd) => {
+        ipcMain.on('sysCmdEvent', async (event, cmd) => {
             // 加载文件
             if (cmd === '#load') {
                 try {
@@ -45,5 +45,6 @@ export const scriptManage = {
                 }
             }
         });
+        ipcMain.on('VueToElectron', (event, cmd) => {});
     }
 };

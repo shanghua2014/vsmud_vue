@@ -21,9 +21,6 @@ import { Base, xTermLoginc } from '@/utils/util';
 // 声明全局 window 对象的自定义属性
 declare global {
     interface Window {
-        customParent: {
-            postMessage: (message: any) => void;
-        };
         electronAPI: {
             send: (channel: string, ...args: any[]) => void;
             on: (channel: string, listener: (...args: any[]) => void) => void;
@@ -48,7 +45,7 @@ const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
 const showDownBtn = ref(false);
 
 // 定义 emit 事件，添加新事件 notifyParent
-const emits = defineEmits(['showDownward', 'menuCommand']);
+const emits = defineEmits(['showDownward', 'menuCommand', 'sendCommandToChannel']);
 
 let removeScrollListener: () => void;
 
@@ -137,7 +134,6 @@ onMounted(() => {
     });
 });
 
-
 /**
  * 处理输入框的输入，将非空命令添加到历史记录并发送命令。
  */
@@ -153,7 +149,7 @@ const handleInput = () => {
         sendCommand(command, terminal);
         // 发送命令到 Telnet 服务器
         window.electronAPI.send('telnet-send', command);
-        window.electronAPI.send('mutual', command);
+        window.electronAPI.send('sysCmdEvent', command);
         inputBox.value = '';
     }
 };
@@ -170,11 +166,18 @@ const sendCommand = (command: string, terminal: any, type?: any) => {
     const yellowColor = '\x1b[0;40m\x1b[1;33m';
     const resetColor = '\x1b[0m';
 
+    // 加载脚本文件
     let cmd = `${greenColor}[ ${command} ]${resetColor}\r\n`;
     if (type === 'client') {
         cmd = `${blueColor}${command}${resetColor}\r\n`;
+        let sp: Array<string> | string = command.split('\\');
+        sp = sp[sp.length - 1];
+        // 触发事件并传递 command 变量
+        emits('sendCommandToChannel', sp);
+        window.electronAPI.send('VueToElectron', sp);
     }
 
+    // 显示内容到终端
     terminal.value.write(`${cmd}\r\n`, () => {
         // 全选输入框中的内容
         if (inputRef.value) {
@@ -201,7 +204,6 @@ const sendCommand = (command: string, terminal: any, type?: any) => {
             terminal.value.write(`${yellowColor}${cmd}${resetColor}\r\n`);
         },
         set: (terminal: any, cmd: string) => {
-            console.log(cmd);
             emits('menuCommand', { command: cmd });
         }
     };
@@ -261,11 +263,10 @@ const scrollToBottom = () => {
     }
 };
 
-
 /**
  * 点击终端区域时让输入框获得焦点。
  */
- const handlefocus = () => {
+const handlefocus = () => {
     inputRef.value?.focus();
 };
 

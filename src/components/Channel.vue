@@ -11,10 +11,8 @@
         </div>
         <div class="config">
             <el-scrollbar class="scripts">
-                <el-checkbox v-model="checked5" label="脚本 1" size="small" />
-                <el-checkbox v-model="checked6" label="脚本 2" size="small" />
-                <el-checkbox v-model="checked7" label="脚本 2" size="small" />
-                <el-checkbox v-model="checked8" label="脚本 2" size="small" />
+                <!-- 使用 v-for 动态渲染 el-checkbox -->
+                <el-checkbox v-for="(label, index) in scriptCheckbox" :key="index" v-model="scriptCheckedStates[index]" :label="label" size="small" checked />
             </el-scrollbar>
             <div class="info flex">
                 <div>道长：<span class="name">小邓小邓_shanghua</span></div>
@@ -34,18 +32,29 @@
 
 <script lang="ts" setup>
 import { onMounted, ref, nextTick, reactive, watch, defineProps } from 'vue';
-// 定义 props 接收选中的 checkbox 值
+// 定义 props 接收新的 checkbox 标签
 const props = defineProps<{
     selectedCategories: string[];
+    loadScript: string;
 }>();
 
 const ps = ref([1, 2, 3, 4, 5, 67, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]);
-const checked5 = ref(false);
-const checked6 = ref(false);
-const checked7 = ref(false);
-const checked8 = ref(false);
-const checked9 = ref(false);
-const checked10 = ref(false);
+
+// 存储复选框标签的数组
+const scriptCheckbox = ref<string[]>([]);
+// 存储每个复选框的选中状态
+const scriptCheckedStates = ref<boolean[]>([]);
+
+// 监听 loadScript 的变化，动态添加标签
+watch(
+    () => props.loadScript,
+    (loadScript) => {
+        if (loadScript && !scriptCheckbox.value.includes(loadScript)) {
+            scriptCheckbox.value.push(loadScript);
+            scriptCheckedStates.value.push(false);
+        }
+    }
+);
 
 // <!-- 水印 -->
 const font = reactive({
@@ -183,7 +192,7 @@ $help-shadow-color: var(--el-color-success);
                 color: yellow;
             }
             .place {
-                color: #E066FF;
+                color: #e066ff;
             }
         }
         .info:last-child {

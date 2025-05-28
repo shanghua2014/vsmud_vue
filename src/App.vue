@@ -4,14 +4,16 @@
             <el-main class="pr">
                 <!-- 使用简化后的方法名 -->
                 <Menu v-if="!hideMenu" :cmd="menuCmd" @checkboxChange="onCheckboxChange" @cancelSelection="onCancel" @confirmSelection="onConfirm" />
-                <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" />
+                <!-- 修改事件绑定名称 -->
+                <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" @sendCommandToChannel="sendToChannel" />
                 <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
                 <Status />
                 <!-- 监听 hideFullme 事件，控制组件显示隐藏 -->
                 <Fullme v-if="showFullme" @hideFullme="hideFullmeComponent" />
             </el-main>
+            <!-- 修改传递的属性名 -->
             <el-aside style="width: 28%">
-                <Channel :selectedCategories="selectedCategories" />
+                <Channel :loadScript="loadScript" :selectedCategories="selectedCategories" />
             </el-aside>
         </el-container>
     </div>
@@ -32,6 +34,13 @@ const mudlist = ref<any>({});
 const hideMenu = ref(false);
 const menuCmd = ref('');
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
+// 修改变量名
+const loadScript = ref('');
+
+// 修改 sendToChannel 函数中使用的变量名
+const sendToChannel = (command: string) => {
+    loadScript.value = `${command}`;
+};
 
 // 控制 Fullme 组件显示隐藏
 const showFullme = ref(false);
