@@ -20,7 +20,7 @@ const createWindow = () => {
         // 默认窗口标题，如果由loadURL()加载的HTML文件中含有标签<title>，此属性将被忽略。
         title: 'Electron + Vue3',
         minWidth: 1224,
-        minHeight: 768,
+        minHeight: screen.getPrimaryDisplay().workAreaSize.height,
         maxWidth: screen.getPrimaryDisplay().workAreaSize.width,
         // 修正拼写错误 maxheight 为 maxHeight
         maxHeight: screen.getPrimaryDisplay().workAreaSize.height,
@@ -31,7 +31,7 @@ const createWindow = () => {
             preload: path.join(__dirname, './electron/electron-preload.js'),
             nodeIntegration: false, //开启true这一步很重要,目的是为了vue文件中可以引入node和electron相关的API
             contextIsolation: true, // 可以使用require方法
-            enableRemoteModule: true, // 可以使用remote方法
+            enableRemoteModule: true // 可以使用remote方法
         }
     });
 
@@ -68,8 +68,9 @@ app.whenReady().then(() => {
 
         // 监听 Telnet 服务器返回的数据，并转发给渲染进程
         telnetClient.on('data', (data) => {
+            console.log(data.toString());
             if (mainWindow) {
-                mainWindow.webContents.send('telnet-data', data.toString());
+                mainWindow.webContents.send('telnet-data', { type: 'mud', content: data.toString() });
             }
         });
 

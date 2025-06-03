@@ -85,25 +85,6 @@ onMounted(() => {
     // 聚焦到输入框
     handlefocus();
 
-    // 监听来自 vscode 扩展的消息
-    // window.addEventListener('message', (event) => {
-    //     // 若协议为 http 则不处理消息
-    //     if (location.protocol === 'http:') return;
-    //     const message = event.data;
-    //     console.log('Vue消息:', message);
-    //     switch (message.type) {
-    //         case 'mud':
-    //             // 处理 mud 消息
-    //             logic.termWrite(terminal, message.datas);
-    //             break;
-    //         case 'cmd':
-    //             // 处理 mud 消息
-    //             base.postMessage({ type: 'command', content: message.datas });
-    //             terminal.value && terminal.value.write('[ ' + message.datas + ' ] \r\n');
-    //             break;
-    //     }
-    // });
-
     // 调用封装的滚动监听方法
     removeScrollListener = logic.setupScrollListener(terminalContainer, showDownBtn, emits);
 
@@ -121,7 +102,7 @@ onMounted(() => {
     window.electronAPI.on('telnet-data', (data: any) => {
         const { content, type } = data;
         if (terminal.value && type === 'mud') {
-            terminal.value.write(`${data}\r\n`);
+            terminal.value.write(`${content}\r\n`);
         }
         if (type === 'client') {
             sendCommand(content, terminal, type);
