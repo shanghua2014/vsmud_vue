@@ -1,12 +1,11 @@
 <template>
-    <div class="common-layout pr">
+    <div class="common-layout pr" v-if="showLayout">
         <el-container>
             <el-main class="pr">
                 <!-- 使用简化后的方法名 -->
                 <Menu v-if="!hideMenu" :cmd="menuCmd" @checkboxChange="onCheckboxChange" @cancelSelection="onCancel" @confirmSelection="onConfirm" />
                 <!-- 修改事件绑定名称 -->
-                <Terminal v-if="showTerminal" @showDownward="onShowDownward" @menuCommand="onMenuCmd" @sendCommandToChannel="sendToChannel" />
-                <Mudlist v-if="!showTerminal" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
+                <Terminal @showDownward="onShowDownward" @menuCommand="onMenuCmd" @sendCommandToChannel="sendToChannel" />
                 <Status />
                 <!-- 监听 hideFullme 事件，控制组件显示隐藏 -->
                 <Fullme v-if="showFullme" @hideFullme="hideFullmeComponent" />
@@ -17,6 +16,7 @@
             </el-aside>
         </el-container>
     </div>
+    <Mudlist v-if="!showLayout" :mudlist="mudlist" @card-clicked="receive.cardClicked" />
 </template>
 
 <script lang="ts" setup>
@@ -29,7 +29,7 @@ import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
-const showTerminal = ref(true);
+const showLayout = ref(false);
 const mudlist = ref<any>({});
 const hideMenu = ref(false);
 const menuCmd = ref('');
@@ -55,7 +55,7 @@ const hideFullmeComponent = () => {
 // =======================
 const receive = {
     cardClicked: () => {
-        showTerminal.value = true;
+        showLayout.value = true;
     }
 };
 
