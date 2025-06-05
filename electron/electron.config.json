@@ -1,7 +1,7 @@
 {
-    "files": ["electron-main.js", "./dist","./electron/**/*"],
-    "productName": "ele-vue",
-    "extraFiles": ["./videos", "./cvideo"],
+    "files": ["electron-main.js", "./dist", "./electron/**/*"],
+    "productName": "Jmud",
+    "extraFiles": ["./config"],
     "directories": {
         "output": "./buileder"
     },
