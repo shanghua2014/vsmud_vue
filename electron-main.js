@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import { app, BrowserWindow, Menu, screen, ipcMain } from 'electron/main';
 import * as path from 'path';
 import { createConnection } from 'net';
-import { scriptManage } from './electron/scriptManage.js';
+import { scriptManage, files } from './electron/scriptManage.js';
 
 const isPackaged = app.isPackaged;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,9 +47,12 @@ const createWindow = () => {
 };
 
 // 在应用准备就绪时调用函数
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     createWindow();
 
+    // 加载文件管理模块
+    files.getFile(mainWindow);
+    
     // 加载脚本管理模块
     scriptManage.mutual(mainWindow);
 
@@ -68,8 +71,8 @@ app.whenReady().then(() => {
 
         // 监听 Telnet 服务器返回的数据，并转发给渲染进程
         telnetClient.on('data', (data) => {
-            console.log(data.toString());
             if (mainWindow) {
+                console.log('cfgFiles----', cfgFiles);
                 mainWindow.webContents.send('telnet-data', { type: 'mud', content: data.toString() });
             }
         });
@@ -102,7 +105,6 @@ app.whenReady().then(() => {
             telnetClient = null;
         }
     });
-
     app.on('activate', () => {
         // 通常在 macOS 上，当点击 dock 中的应用程序图标时，如果没有其他
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

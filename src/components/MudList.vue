@@ -32,19 +32,22 @@
                 </div>
                 <div class="submit-box" v-if="isCreated">
                     <!-- 保存按钮 -->
-                    <el-button type="success" size="small" :icon="Check" round @click.native.stop="saveChanges(card)" />
+                    <el-button type="success" size="small" :icon="Check" round @click.native.stop="saveEdit(card)" />
                     <!-- 取消按钮 -->
                     <el-button type="danger" size="small" :icon="CloseBold" round @click.native.stop="cancelEdit(card)" />
                 </div>
             </div>
         </el-card>
+        <el-tooltip class="box-item" effect="dark" content="添加站点" placement="top">
+            <el-icon class="add"><plus style="width: 23px; height: 23px" /></el-icon>
+        </el-tooltip>
     </el-row>
 </template>
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, Edit, CloseBold } from '@element-plus/icons-vue';
+import { Check, Edit, CloseBold, Plus } from '@element-plus/icons-vue';
 import { Base } from '@/utils/util';
 import { useConfigStore } from '@/stores/store';
 
@@ -57,7 +60,7 @@ const cardClick = ref(true);
 const title = ref<HTMLInputElement[]>([]);
 // 定义卡片列表
 interface CardModel {
-    isEditing: boolean;
+    isEditing?: boolean;
     title: string;
     ip: string;
     port: string;
@@ -65,7 +68,50 @@ interface CardModel {
     password: string;
     name: string;
 }
-const cards = ref<CardModel[]>([]);
+
+// 为 cards 添加默认值
+const cards = ref<CardModel[]>([
+    {
+        title: '示例站点',
+        ip: '127.0.0.1',
+        port: '8080',
+        account: 'example_user',
+        password: 'example_password',
+        name: '示例角色'
+    },
+    {
+        title: '示例站点',
+        ip: '127.0.0.1',
+        port: '8080',
+        account: 'example_user',
+        password: 'example_password',
+        name: '示例角色'
+    },
+    {
+        title: '示例站点',
+        ip: '127.0.0.1',
+        port: '8080',
+        account: 'example_user',
+        password: 'example_password',
+        name: '示例角色'
+    },
+    {
+        title: '示例站点',
+        ip: '127.0.0.1',
+        port: '8080',
+        account: 'example_user',
+        password: 'example_password',
+        name: '示例角色'
+    },
+    {
+        title: '示例站点',
+        ip: '127.0.0.1',
+        port: '8080',
+        account: 'example_user',
+        password: 'example_password',
+        name: '示例角色'
+    }
+]);
 
 // 切换编辑模式
 const toggleEdit = (card: any, edit: boolean) => {
@@ -89,7 +135,7 @@ const getTrimData = (card: any) => {
 };
 
 // 添加、修改
-const saveChanges = (card: any) => {
+const saveEdit = (card: any) => {
     console.log('添加、修改');
     // 更新函数调用
     const trimData = getTrimData(card);
@@ -229,6 +275,7 @@ onMounted(() => {
 .mud-list {
     flex-direction: row;
     position: relative;
+    align-items: flex-end;
     input {
         width: 100%;
         box-sizing: border-box;
@@ -237,7 +284,7 @@ onMounted(() => {
         cursor: pointer;
     }
     .card-item {
-        width: 20%;
+        width: 18%;
         margin: 10px 0 0 10px;
         .edit-box {
             position: absolute;
@@ -259,6 +306,15 @@ onMounted(() => {
         .submit-box {
             margin-top: 20px;
         }
+    }
+    .add {
+        color: #fff;
+        background: green;
+        cursor: pointer;
+        width: 25px;
+        height: 25px;
+        border-radius: 2px;
+        margin-left: 10px;
     }
 }
 </style>

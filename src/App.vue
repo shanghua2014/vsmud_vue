@@ -29,6 +29,16 @@ import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
 import { Base } from './utils/util';
 
+// 声明全局 window 对象的自定义属性
+declare global {
+    interface Window {
+        electronAPI: {
+            send: (channel: string, ...args: any[]) => void;
+            on: (channel: string, listener: (...args: any[]) => void) => void;
+        };
+    }
+}
+
 const showLayout = ref(false);
 const mudlist = ref<any>({});
 const hideMenu = ref(false);
@@ -85,6 +95,11 @@ const onConfirm = (value: string[]) => {
 // 接收来自vscode扩展的消息
 onMounted(() => {
     // new Base().postMessage({ type: 'getAccount', content: '' });
+    window.electronAPI.send('siteList', 1);
+    window.electronAPI.on('site-data', (data: any) => {
+        const { content, type } = data;
+        console.log(content);
+    });
 });
 
 // 组件卸载时断开观察器
