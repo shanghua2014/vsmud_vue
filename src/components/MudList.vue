@@ -4,15 +4,15 @@
             <template #header>
                 <div class="card-header aqua">
                     <!-- 动态切换为 span 或 input -->
-                    <span v-if="!isCreated">
+                    <div v-if="!card.isEditing" style="height: 21px; line-height: 21px">
                         <b>{{ card.title ? card.title : '站点' }}</b>
-                    </span>
+                    </div>
                     <input v-else ref="title" placeholder="站点名称" v-model="card.title" />
                 </div>
             </template>
             <div class="card-body pr">
                 <!-- 动态切换为 p 或 input -->
-                <template v-if="!isCreated">
+                <template v-if="!card.isEditing">
                     <p class="chartreuse">服务器：{{ card.ip }}</p>
                     <p class="chartreuse">端口：{{ card.port }}</p>
                     <p class="yellow">账号：{{ card.account }}</p>
@@ -22,15 +22,15 @@
                 <template v-else>
                     <input v-model="card.ip" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
-                    <input v-model="card.account" placeholder="账号" disabled="false" />
+                    <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
                     <input v-model="card.password" placeholder="密码（非必填）" />
                     <input v-model="card.name" placeholder="角色" />
                 </template>
-                <div class="edit-box pa" v-if="!isCreated && cardClick">
+                <div class="edit-box pa" v-if="!card.isEditing && cardClick">
                     <!-- 编辑按钮 -->
                     <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card, true)" />
                 </div>
-                <div class="submit-box" v-if="isCreated">
+                <div class="submit-box" v-if="card.isEditing">
                     <!-- 保存按钮 -->
                     <el-button type="success" size="small" :icon="Check" round @click.native.stop="saveEdit(card)" />
                     <!-- 取消按钮 -->
@@ -39,7 +39,7 @@
             </div>
         </el-card>
         <el-tooltip class="box-item" effect="dark" content="添加站点" placement="top">
-            <el-icon class="add"><plus style="width: 23px; height: 23px" /></el-icon>
+            <el-icon class="add" @click="add"><plus style="width: 23px; height: 23px" /></el-icon>
         </el-tooltip>
     </el-row>
 </template>
@@ -71,56 +71,41 @@ interface CardModel {
 
 // 为 cards 添加默认值
 const cards = ref<CardModel[]>([
-    {
-        title: '示例站点',
-        ip: '127.0.0.1',
-        port: '8080',
-        account: 'example_user',
-        password: 'example_password',
-        name: '示例角色'
-    },
-    {
-        title: '示例站点',
-        ip: '127.0.0.1',
-        port: '8080',
-        account: 'example_user',
-        password: 'example_password',
-        name: '示例角色'
-    },
-    {
-        title: '示例站点',
-        ip: '127.0.0.1',
-        port: '8080',
-        account: 'example_user',
-        password: 'example_password',
-        name: '示例角色'
-    },
-    {
-        title: '示例站点',
-        ip: '127.0.0.1',
-        port: '8080',
-        account: 'example_user',
-        password: 'example_password',
-        name: '示例角色'
-    },
-    {
-        title: '示例站点',
-        ip: '127.0.0.1',
-        port: '8080',
-        account: 'example_user',
-        password: 'example_password',
-        name: '示例角色'
-    }
+    // {
+    //     isEditing: false,
+    //     title: '示例站点',
+    //     ip: '127.0.0.1',
+    //     port: '8080',
+    //     account: 'example_user',
+    //     password: 'example_password',
+    //     name: '示例角色'
+    // }
 ]);
+
+const base = new Base();
+
+// 添加卡片
+const add = () => {
+    if (isCreated.value) return;
+    // 添加一个新的卡片
+    cards.value.push({
+        isEditing: true,
+        title: '',
+        ip: '',
+        port: '',
+        account: '',
+        password: '',
+        name: ''
+    });
+    allowClick.value = false;
+    isCreated.value = true;
+};
 
 // 切换编辑模式
 const toggleEdit = (card: any, edit: boolean) => {
     card.isEditing = edit;
-    isCreated.value = true;
     allowClick.value = !card.isEditing;
 };
-
-const base = new Base();
 
 // 封装函数处理 card 属性的 trim 操作
 const getTrimData = (card: any) => {
@@ -147,9 +132,12 @@ const saveEdit = (card: any) => {
         });
         return;
     }
-    isCreated.value = false;
+    
     card.isEditing = false;
     allowClick.value = !card.isEditing;
+    if (isCreated.value) {
+        isCreated.value = false;
+    }
 
     setTimeout(() => {
         base.postMessage({
@@ -177,7 +165,7 @@ const cancelEdit = (card: any) => {
 
     if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
         if (card.isEditing) {
-            isCreated.value = false;
+            // isEditing.value = false;
             card.isEditing = false;
             allowClick.value = !card.isEditing;
         } else {
@@ -185,19 +173,13 @@ const cancelEdit = (card: any) => {
             return;
         }
     }
+
     if (isCreated.value) {
-        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.name) {
-            ElMessageBox.alert('请填写所有信息！', '温馨提示');
-            return;
-        }
-        if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
-            ElMessageBox.alert('如想关闭，请直接关闭.vmud文件', '温馨提示');
-            return;
-        }
+        cards.value.pop();
+        isCreated.value = false;
     }
 
     allowClick.value = true;
-    isCreated.value ? (isCreated.value = false) : '';
 };
 
 // 点击卡片
@@ -237,7 +219,6 @@ const emits = defineEmits<{
 onMounted(() => {
     window.addEventListener('message', (event) => {
         const message = event.data;
-        // console.log('收到消息', message)
         try {
             if (message.type === 'getConfig') {
                 console.log(message.datas);
@@ -314,7 +295,7 @@ onMounted(() => {
         width: 25px;
         height: 25px;
         border-radius: 2px;
-        margin-left: 10px;
+        margin: 10px 0 0 10px;
     }
 }
 </style>
