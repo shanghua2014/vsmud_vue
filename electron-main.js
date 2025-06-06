@@ -24,6 +24,10 @@ const createWindow = () => {
         maxWidth: screen.getPrimaryDisplay().workAreaSize.width,
         // 修正拼写错误 maxheight 为 maxHeight
         maxHeight: screen.getPrimaryDisplay().workAreaSize.height,
+        backgroundColor: '#121212',
+        contentProtection: true,
+        // 窗口是否可以被最大化，默认值为 true。
+        maximizable: true,
         // 在根目录中新建 build 文件夹存放图标等文件
         icon: path.resolve(__dirname, './build/icon.ico'),
         //   将此脚本(preload)附加到渲染器流程
@@ -41,7 +45,7 @@ const createWindow = () => {
         mainWindow.loadURL('http://localhost:9000/'); //这样的话需要先用mpm run dev 跑起你自己的项目在跑electron才能出现页面
         //mainWindow.loadFile('./dist/index.html'); //这个是从dist下的index进行加载
     } else {
-        mainWindow.webContents.openDevTools();
+        // mainWindow.webContents.openDevTools();
         mainWindow.loadFile(path.resolve(__dirname, './dist/index.html'));
     }
 };
@@ -52,16 +56,17 @@ app.whenReady().then(async () => {
 
     // 加载文件管理模块
     files.getFile(mainWindow);
-    
+
     // 加载脚本管理模块
     scriptManage.mutual(mainWindow);
 
     // IPC 通信：监听渲染进程的 Telnet 连接请求
     ipcMain.on('telnet-connect', async (event, config) => {
+        const { ip, port } = config.content;
         telnetClient = createConnection(
             {
-                host: config.host,
-                port: config.port || 23
+                host: ip,
+                port: port || 23
             },
             () => {
                 // 通知渲染进程连接成功
@@ -72,7 +77,6 @@ app.whenReady().then(async () => {
         // 监听 Telnet 服务器返回的数据，并转发给渲染进程
         telnetClient.on('data', (data) => {
             if (mainWindow) {
-                console.log('cfgFiles----', cfgFiles);
                 mainWindow.webContents.send('telnet-data', { type: 'mud', content: data.toString() });
             }
         });

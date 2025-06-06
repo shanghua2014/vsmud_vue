@@ -27,6 +27,8 @@
                     <input v-model="card.name" placeholder="角色" />
                 </template>
                 <div class="edit-box pa" v-if="!card.isEditing && cardClick">
+                    <!-- 删除按钮 -->
+                    <el-button type="danger" size="small" :icon="Delete" round @click.native.stop="del(card, index)" />
                     <!-- 编辑按钮 -->
                     <el-button type="primary" size="small" :icon="Edit" round @click.native.stop="toggleEdit(card, true)" />
                 </div>
@@ -34,7 +36,7 @@
                     <!-- 保存按钮 -->
                     <el-button type="success" size="small" :icon="Check" round @click.native.stop="saveEdit(card)" />
                     <!-- 取消按钮 -->
-                    <el-button type="danger" size="small" :icon="CloseBold" round @click.native.stop="cancelEdit(card)" />
+                    <el-button type="info" size="small" :icon="CloseBold" round @click.native.stop="cancelEdit(card)" />
                 </div>
             </div>
         </el-card>
@@ -47,7 +49,7 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, Edit, CloseBold, Plus } from '@element-plus/icons-vue';
+import { Check, Edit, CloseBold, Plus, Delete } from '@element-plus/icons-vue';
 import { Base } from '@/utils/util';
 import { useConfigStore } from '@/stores/store';
 
@@ -58,7 +60,8 @@ const allowClick = ref(true);
 const cardClick = ref(true);
 // 定义title的ref
 const title = ref<HTMLInputElement[]>([]);
-// 定义卡片列表
+
+// 定义卡片列表数据类型
 interface CardModel {
     isEditing?: boolean;
     title: string;
@@ -69,20 +72,35 @@ interface CardModel {
     name: string;
 }
 
+// 定义 props 接收父级传递的 mudlist 数据
+const props = defineProps<{
+    mudlist: Array<CardModel>;
+}>();
+
 // 为 cards 添加默认值
-const cards = ref<CardModel[]>([
-    // {
-    //     isEditing: false,
-    //     title: '示例站点',
-    //     ip: '127.0.0.1',
-    //     port: '8080',
-    //     account: 'example_user',
-    //     password: 'example_password',
-    //     name: '示例角色'
-    // }
-]);
+// const cards = ref<CardModel[]>([
+//     {
+//         isEditing: false,
+//         title: '示例站点',
+//         ip: '127.0.0.1',
+//         port: '8080',
+//         account: 'example_user',
+//         password: 'example_password',
+//         name: '示例角色'
+//     }
+// ]);
+const cards = ref<typeof props.mudlist>(props.mudlist);
 
 const base = new Base();
+
+const del = (card: any, i: number) => {
+    // 根据下标删除数据
+    cards.value.splice(i, 1);
+    base.sendSiteList({
+        type: 'del',
+        content: getTrimData(card)
+    });
+};
 
 // 添加卡片
 const add = () => {
@@ -119,7 +137,7 @@ const getTrimData = (card: any) => {
     };
 };
 
-// 添加、修改
+// 修改
 const saveEdit = (card: any) => {
     console.log('添加、修改');
     // 更新函数调用
@@ -132,19 +150,17 @@ const saveEdit = (card: any) => {
         });
         return;
     }
-    
+
     card.isEditing = false;
     allowClick.value = !card.isEditing;
     if (isCreated.value) {
         isCreated.value = false;
     }
 
-    setTimeout(() => {
-        base.postMessage({
-            type: 'save',
-            content: trimData
-        });
-    }, 500);
+    base.sendSiteList({
+        type: 'save',
+        content: getTrimData(trimData)
+    });
 };
 
 // 取消编辑
@@ -197,14 +213,14 @@ const allowClicked = (card: any) => {
         password: card.password,
         name: card.name
     };
-    emits('cardClicked', '通知父级');
+    emits('cardClicked', true);
 
     // 设置store
-    const configStore = useConfigStore();
-    configStore.setConfig(datas);
+    // const configStore = useConfigStore();
+    // configStore.setConfig(datas);
 
-    base.postMessage({
-        type: 'connect',
+    base.sendMessage({
+        type: 'telnet',
         content: datas
     });
 };
@@ -217,38 +233,38 @@ const emits = defineEmits<{
 }>();
 
 onMounted(() => {
-    window.addEventListener('message', (event) => {
-        const message = event.data;
-        try {
-            if (message.type === 'getConfig') {
-                console.log(message.datas);
-                message.datas = JSON.parse(message.datas);
-                const { ip, account } = message.datas;
-                if (!ip) {
-                    // 创建模式
-                    isCreated.value = true;
-                    // 禁止点击卡片
-                    allowClick.value = false;
-                    cards.value.push({
-                        isEditing: false,
-                        title: '',
-                        ip: '',
-                        port: '',
-                        account: account,
-                        password: '',
-                        name: ''
-                    });
-                } else {
-                    // 正常模式
-                    isCreated.value = false;
-                    allowClick.value = true;
-                    cards.value.push(message.datas);
-                }
-            }
-        } catch (error) {
-            console.log('error', error);
-        }
-    });
+    // window.addEventListener('message', (event) => {
+    //     const message = event.data;
+    //     try {
+    //         if (message.type === 'getConfig') {
+    //             console.log(message.datas);
+    //             message.datas = JSON.parse(message.datas);
+    //             const { ip, account } = message.datas;
+    //             if (!ip) {
+    //                 // 创建模式
+    //                 isCreated.value = true;
+    //                 // 禁止点击卡片
+    //                 allowClick.value = false;
+    //                 cards.value.push({
+    //                     isEditing: false,
+    //                     title: '',
+    //                     ip: '',
+    //                     port: '',
+    //                     account: account,
+    //                     password: '',
+    //                     name: ''
+    //                 });
+    //             } else {
+    //                 // 正常模式
+    //                 isCreated.value = false;
+    //                 allowClick.value = true;
+    //                 cards.value.push(message.datas);
+    //             }
+    //         }
+    //     } catch (error) {
+    //         console.log('error', error);
+    //     }
+    // });
 });
 </script>
 

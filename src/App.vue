@@ -40,7 +40,7 @@ declare global {
 }
 
 const showLayout = ref(false);
-const mudlist = ref<any>({});
+const mudlist = ref<any>([]);
 const hideMenu = ref(false);
 const menuCmd = ref('');
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
@@ -64,8 +64,10 @@ const hideFullmeComponent = () => {
 //    接收子组件的消息
 // =======================
 const receive = {
-    cardClicked: () => {
-        showLayout.value = true;
+    cardClicked: (showTerminal: boolean) => {
+        showLayout.value = showTerminal;
+        // const datas = { type: 'telnet', content: Object.assign({ host: 'host', port: 'port' }, data) };
+        // window.electronAPI.send('telnet-connect', datas);
     }
 };
 
@@ -97,8 +99,11 @@ onMounted(() => {
     // new Base().postMessage({ type: 'getAccount', content: '' });
     window.electronAPI.send('siteList', 1);
     window.electronAPI.on('site-data', (data: any) => {
-        const { content, type } = data;
-        console.log(content);
+        const { content } = data;
+        for (let i in content) {
+            const cont = JSON.parse(content[i]);
+            mudlist.value.push(cont);
+        }
     });
 });
 

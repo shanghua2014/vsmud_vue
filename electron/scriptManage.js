@@ -27,7 +27,9 @@ async function readAllFilesInDir(dirPath) {
         } else {
             try {
                 const content = await fs.readFile(fullPath, 'utf-8');
-                result[file.split('.')[0]] = content;
+                // 去掉文件内容中的 \r 和 \n
+                const cleanedContent = content.replace(/[\r\n]/g, '');
+                result[file.split('.')[0]] = cleanedContent;
             } catch (err) {
                 console.error(`读取文件 ${fullPath} 出错:`, err);
             }
@@ -40,9 +42,33 @@ async function readAllFilesInDir(dirPath) {
 export const files = {
     getFile: async (mainWindow) => {
         ipcMain.on('siteList', async (event, cmd) => {
+            const configDir = path.join(process.cwd(), 'config');
+            const { content } = cmd;
+            if (cmd.type === 'del') {
+                // 删除configDir目录下以account为文件名的文件;
+                try {
+                    const filePath = path.join(configDir, `${content.account}.json`);
+                    await fs.unlink(filePath);
+                } catch (err) {
+                    console.error('删除文件时出错:', err);
+                }
+                return;
+            }
+            if (cmd.type === 'save') {
+                try {
+                    // 确保 config 目录存在
+                    await fs.mkdir(configDir, { recursive: true });
+                    const filePath = path.join(configDir, `${content.account}.json`);
+                    // 将 cmd.content 转换为 JSON 字符串并写入文件
+                    await fs.writeFile(filePath, JSON.stringify(content, null, 2));
+                    console.log(`文件 ${filePath} 保存成功`);
+                } catch (err) {
+                    console.error('保存文件时出错:', err);
+                }
+                return;
+            }
             try {
                 // 假设项目根目录下的 /config 目录
-                const configDir = path.join(process.cwd(), 'config');
                 const fileContent = await readAllFilesInDir(configDir);
                 mainWindow.webContents.send('site-data', { type: 'client', content: fileContent });
             } catch (err) {
@@ -59,6 +85,7 @@ export const scriptManage = {
      * @param {*} mainWindow 主窗口
      */
     mutual: (mainWindow) => {
+        // 系统命令事件
         ipcMain.on('sysCmdEvent', async (event, cmd) => {
             // 加载文件
             if (cmd === '#load') {
@@ -97,6 +124,7 @@ export const scriptManage = {
                 }
             }
         });
-        ipcMain.on('VueToElectron', (event, cmd) => {});
+        // 游戏命令事件
+        ipcMain.on('gameCmdEvent', async (event, cmd) => {});
     }
 };

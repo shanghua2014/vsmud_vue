@@ -7,16 +7,21 @@ export interface Message {
 
 declare global {
     interface Window {
-        customParent: {
-            postMessage: (message: any) => void;
+        electronAPI: {
+            send: (channel: string, ...args: any[]) => void;
+            on: (channel: string, listener: (...args: any[]) => void) => void;
         };
     }
 }
 
 // 公共类库
 export class Base {
-    public postMessage(msg: Message) {
-        // location.protocol != 'http:' && window.customParent.postMessage({ type: msg.type, content: msg.content });
+    // 登录界面数据交互
+    public sendSiteList(msg: Message) {
+        window.electronAPI.send('siteList', msg);
+    }
+    public sendMessage(msg: Message) {
+        window.electronAPI.send('telnet-connect', msg); 
     }
 }
 
@@ -42,7 +47,7 @@ export class xTermLoginc {
             if (account) {
                 setTimeout(() => {
                     console.log('发送账号');
-                    this.base.postMessage({
+                    this.base.sendMessage({
                         type: 'command',
                         content: account
                     });
@@ -52,7 +57,7 @@ export class xTermLoginc {
         if (/，请输入密码/.test(msg)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
-                this.base.postMessage({
+                this.base.sendMessage({
                     type: 'command',
                     content: password
                 });
@@ -61,7 +66,7 @@ export class xTermLoginc {
         if (/即将开始检测你的客户端/.test(msg)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
-                this.base.postMessage({
+                this.base.sendMessage({
                     type: 'command',
                     content: 'y'
                 });
