@@ -26,6 +26,7 @@ const createWindow = () => {
         maxHeight: screen.getPrimaryDisplay().workAreaSize.height,
         backgroundColor: '#121212',
         contentProtection: true,
+        CSP: "default-src 'self' http: https:",
         // 窗口是否可以被最大化，默认值为 true。
         maximizable: true,
         // 在根目录中新建 build 文件夹存放图标等文件

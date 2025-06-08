@@ -139,12 +139,20 @@ const getTrimData = (card: any) => {
 
 // 修改
 const saveEdit = (card: any) => {
-    console.log('添加、修改');
     // 更新函数调用
     const trimData = getTrimData(card);
     if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
         ElMessage({
             message: '内容不能为空！',
+            type: 'error',
+            duration: 1000 // 提示持续时间（毫秒）
+        });
+        return;
+    }
+
+    if (!/(\w\.)/.test(trimData.ip)) {
+        ElMessage({
+            message: 'IP地址格式错误！',
             type: 'error',
             duration: 1000 // 提示持续时间（毫秒）
         });

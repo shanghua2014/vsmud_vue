@@ -64,9 +64,9 @@ onMounted(() => {
     });
 
     // 向终端写入欢迎信息
-    for (let i = 0; i < 100; i++) {
-        terminal.value.write(`[ 欢迎使用 xTerm 终端-${i} ]\r\n`);
-    }
+    // for (let i = 0; i < 100; i++) {
+    //     terminal.value.write(`[ 欢迎使用 xTerm 终端-${i} ]\r\n`);
+    // }
 
     // 创建终端尺寸适配插件实例
     const fitAddon = new FitAddon();
@@ -103,10 +103,11 @@ onMounted(() => {
         const { content, type } = data;
         if (terminal.value && type === 'mud') {
             terminal.value.write(`${content}\r\n`);
+            logic.termWrite(terminal, content);
         }
-        if (type === 'client') {
-            sendCommand(content, terminal, type);
-        }
+        // if (type === 'client') {
+        //     sendCommand(content, terminal, type);
+        // }
     });
 
     // 监听连接断开事件

@@ -16,7 +16,7 @@ declare global {
 
 // 公共类库
 export class Base {
-    // 登录界面数据交互
+    // 登录界面数据交互      
     public sendSiteList(msg: Message) {
         window.electronAPI.send('siteList', msg);
     }
