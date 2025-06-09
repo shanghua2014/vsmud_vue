@@ -100,11 +100,11 @@ onMounted(() => {
 
     // 监听 Telnet 数据（显示到终端）
     window.electronAPI.on('telnet-data', (data: any) => {
-        const { content, type } = data;
-        // console.log('content', content);
-        if (terminal.value && type === 'mud') {
-            // terminal.value.write(`${content}\r\n`);
-            logic.termWrite(terminal, content);
+        // const { content, type } = data;
+        if (terminal.value) {
+            // if (type === 'mud') {
+            logic.termWrite(terminal, data);
+            // }
         }
         // if (type === 'client') {
         //     sendCommand(content, terminal, type);
@@ -132,7 +132,7 @@ const handleInput = () => {
         sendCommand(command, terminal);
         // 发送命令到 Telnet 服务器
         window.electronAPI.send('telnet-send', command);
-        window.electronAPI.send('sysCmdEvent', command);
+        // window.electronAPI.send('sysCmdEvent', command);
         inputBox.value = '';
     }
 };
@@ -173,19 +173,19 @@ const sendCommand = (command: string, terminal: any, type?: any) => {
         // 确保光标在最底部
         scrollToBottom();
 
-        if (command === 'telnet') {
-            console.log('连接mud.pkuxkx.net');
-            connectTelnet('mud.pkuxkx.net', 8081);
-        }
+        // if (command === 'telnet') {
+        //     console.log('连接mud.pkuxkx.net');
+        //     connectTelnet('mud.pkuxkx.net', 8081);
+        // }
     });
 
     // 定义可替换的关键字数组，使用 as const 声明为只读元组
     const keywords = ['show', 'set'] as const;
     // 定义关键字对应的处理函数对象
     const keywordHandlers = {
-        show: (terminal: any, cmd: string) => {
-            terminal.value.write(`${yellowColor}${cmd}${resetColor}\r\n`);
-        },
+        // show: (terminal: any, cmd: string) => {
+        //     terminal.value.write(`${yellowColor}${cmd}${resetColor}\r\n`);
+        // },
         set: (terminal: any, cmd: string) => {
             emits('menuCommand', { command: cmd });
         }
@@ -193,21 +193,21 @@ const sendCommand = (command: string, terminal: any, type?: any) => {
     let isMatched = false;
 
     // 使用 for 循环遍历，明确 keyword 的类型
-    for (const keyword of keywords) {
-        // 使用 RegExp 构造函数创建动态正则表达式
-        const showRegex = new RegExp(`^#${keyword}\\s?(.*)*`);
-        const match = showRegex.exec(command);
-        if (match) {
-            isMatched = true;
-            // 测试触发，不发送服务器请求
-            const cmd = match[1];
-            if (keywordHandlers[keyword]) {
-                // 唤起前端界面，用match['input']
-                // 后端命令用cmd
-                keywordHandlers[keyword](terminal, cmd == undefined ? match['input'] : cmd);
-            }
-        }
-    }
+    // for (const keyword of keywords) {
+    //     // 使用 RegExp 构造函数创建动态正则表达式
+    //     const showRegex = new RegExp(`^#${keyword}\\s?(.*)*`);
+    //     const match = showRegex.exec(command);
+    //     if (match) {
+    //         isMatched = true;
+    //         // 测试触发，不发送服务器请求
+    //         const cmd = match[1];
+    //         if (keywordHandlers[keyword]) {
+    //             // 唤起前端界面，用match['input']
+    //             // 后端命令用cmd
+    //             keywordHandlers[keyword](terminal, cmd == undefined ? match['input'] : cmd);
+    //         }
+    //     }
+    // }
 
     if (!isMatched) {
         // 向基础服务发送命令

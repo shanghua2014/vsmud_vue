@@ -3,7 +3,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 // 暴露需要的 IPC 方法到渲染进程的 window 对象
 contextBridge.exposeInMainWorld('electronAPI', {
     send: (channel, data) => ipcRenderer.send(channel, data), // 发送消息
-    on: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)) // 监听消息
+    on: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)), // 监听消息
+    off: (channel, callback) => {
+        // 删除指定通道和回调的监听事件
+        ipcRenderer.off(channel, (event, ...args) => callback(...args));
+    }
 });
 
 // 原 DOMContentLoaded 事件监听保持不变

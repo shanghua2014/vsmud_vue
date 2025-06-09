@@ -2,6 +2,7 @@ import { ipcMain, dialog } from 'electron/main';
 import { createRequire } from 'module';
 import fs from 'fs/promises';
 import path from 'path';
+import axios from 'axios';
 
 const require = createRequire(import.meta.url);
 // 替换为更短的变量名
@@ -76,6 +77,45 @@ export const files = {
                 return {};
             }
         });
+    },
+    getFullme: async (filename) => {
+        console.log('html');
+        const fullmeDir = path.join(process.cwd(), 'fullme');
+        if (!fs.existsSync(fullmeDir)) {
+            fs.mkdirSync(fullmeDir);
+        }
+        const timestamp = Date.now().toString();
+        const subdir = path.join(fullmeDir, timestamp);
+        fs.mkdirSync(subdir);
+        let fullme = {
+            name: timestamp,
+            data: []
+        };
+        for (let i = 1; i <= 4; i++) {
+            try {
+                const url = `http://fullme.pkuxkx.net/robot.php?filename=${filename}`;
+                const response = await axios.get(url, { responseType: 'text' });
+                const html = response.data;
+
+                // 使用正则表达式匹配 img 标签的 src 属性
+                const imgSrcMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+                if (!imgSrcMatch) {
+                    throw new Error('未在 HTML 中找到 img 标签');
+                }
+                const imgSrc = imgSrcMatch[1];
+                const imgUrl = new URL(imgSrc, url).href;
+
+                const imgResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+                const buffer = Buffer.from(imgResponse.data, 'binary');
+                fullme.data[i - 1] = buffer.toString('base64');
+                const imageFilename = `${i}.jpg`;
+                const filepath = path.join(subdir, imageFilename);
+                await fs.writeFile(filepath, buffer);
+            } catch (error) {
+                console.error(`Error downloading image ${i}:`, error.message);
+            }
+            return fullme;
+        }
     }
 };
 
@@ -84,11 +124,14 @@ export const scriptManage = {
      * 互操作
      * @param {*} mainWindow 主窗口
      */
-    mutual: (mainWindow) => {
-        // 系统命令事件
-        ipcMain.on('sysCmdEvent', async (event, cmd) => {
-            // 加载文件
-            if (cmd === '#load') {
+    mutual: (mainWindow, telnetClient, command) => {
+        const keywords = ['#load', '#re', '#show', '#set'];
+        const keywordHandlers = {
+            '#show': (command) => {
+                mainWindow.webContents.send('telnet-data', { type: 'test', content: command });
+                return;
+            },
+            '#load': async () => {
                 try {
                     const result = await dialog.showOpenDialog({
                         properties: ['openFile'],
@@ -105,9 +148,8 @@ export const scriptManage = {
                 } catch (err) {
                     console.error('加载文件时出错:', err);
                 }
-            }
-            // 重载文件
-            if (cmd === '#re') {
+            },
+            '#re': () => {
                 try {
                     // 修改变量名
                     for (const filePath of loadedMods) {
@@ -123,8 +165,67 @@ export const scriptManage = {
                     console.error('重载文件时出错:', err);
                 }
             }
-        });
-        // 游戏命令事件
-        ipcMain.on('gameCmdEvent', async (event, cmd) => {});
+        };
+        for (const keyword of keywords) {
+            // 使用 RegExp 构造函数创建动态正则表达式
+            const showRegex = new RegExp(`^${keyword}\\s?(.*)*`);
+            const match = showRegex.exec(command);
+            if (match) {
+                // isMatched = true;
+                // 测试触发，不发送服务器请求
+                const cmd = match[1];
+                if (keywordHandlers[keyword]) {
+                    // 唤起前端界面，用match['input']
+                    // 后端命令用cmd
+                    keywordHandlers[keyword](cmd == undefined ? match['input'] : cmd);
+                }
+            }
+        }
+
+        // 游戏命令
+        if (!/^#/.test(command)) {
+            telnetClient.write(command + '\r\n');
+        }
+
+        // 加载文件
+        // if (command === '#load') {
+        //     try {
+        //         const result = await dialog.showOpenDialog({
+        //             properties: ['openFile'],
+        //             filters: [{ name: 'JavaScript Files', extensions: ['js'] }]
+        //         });
+
+        //         if (!result.canceled && result.filePaths.length > 0) {
+        //             const selectedFilePath = result.filePaths[0];
+        //             mainWindow.webContents.send('telnet-data', { type: 'client', content: selectedFilePath });
+        //             require(selectedFilePath);
+        //             loadedMods.add(selectedFilePath);
+        //             console.log(`已成功执行文件: ${selectedFilePath}`);
+        //         }
+        //     } catch (err) {
+        //         console.error('加载文件时出错:', err);
+        //     }
+        // }
+        // 重载文件
+        // if (command === '#re') {
+        //     try {
+        //         // 修改变量名
+        //         for (const filePath of loadedMods) {
+        //             // 清除模块缓存
+        //             if (require.cache[require.resolve(filePath)]) {
+        //                 delete require.cache[require.resolve(filePath)];
+        //             }
+        //             // 重新加载模块
+        //             require(filePath);
+        //             console.log(`已成功重载文件: ${filePath}`);
+        //         }
+        //     } catch (err) {
+        //         console.error('重载文件时出错:', err);
+        //     }
+        // }
+        // if (.test(cmd)) {
+
+        // }
+        // });
     }
 };

@@ -42,25 +42,26 @@ export class xTermLoginc {
         this.scrollTop = 0;
     }
 
-    public termWrite(terminal: any, msg: any) {
-        terminal.value.write(`${msg}`);
-        console.log('写入数据：', msg);
+    public termWrite(terminal: any, data: any) {
+        const { content, type } = data;
+        terminal.value.write(`${content}`);
+        console.log('写入数据：', content);
         const configStore = useConfigStore();
-        if (/((你|您)的英文名)|(人物请输入new。)/.test(msg)) {
+        if (/((你|您)的英文名)|(人物请输入new。)/.test(content)) {
             const account = configStore.configInfo?.account.trim();
             if (account) {
                 console.log('发送账号', account);
                 this.base.sendMessage(account);
             }
         }
-        if (/，请输入密码/.test(msg)) {
+        if (/，请输入密码/.test(content)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
                 console.log('发送密码', password);
                 this.base.sendMessage(password);
             }
         }
-        if (/即将开始检测你的客户端/.test(msg)) {
+        if (/即将开始检测你的客户端/.test(content)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
                 this.base.sendMessage('y');

@@ -58,9 +58,6 @@ app.whenReady().then(async () => {
     // 加载文件管理模块
     files.getFile(mainWindow);
 
-    // 加载脚本管理模块
-    scriptManage.mutual(mainWindow);
-
     // IPC 通信：连接请求
     ipcMain.on('telnet-connect', async (event, config) => {
         const { ip, port } = config.content;
@@ -76,10 +73,16 @@ app.whenReady().then(async () => {
         );
 
         // 监听 Telnet 服务器返回的数据，并转发给渲染进程
-        telnetClient.on('data', (data) => {
+        telnetClient.on('data', async (data) => {
             if (mainWindow) {
-                console.log(data.toString());
-                mainWindow.webContents.send('telnet-data', { type: 'mud', content: data.toString() });
+                // console.log(data);
+                const muddata = data.toString();
+                console.log(muddata);
+                if (/^http:\/\/fullme\.pkuxkx\.net/.test(muddata)) {
+                    // http://fullme.pkuxkx.net/robot.php?filename=1749457537780159
+                    muddata = await files.getFullme(muddata.split('=')[1]);
+                }
+                mainWindow.webContents.send('telnet-data', { type: 'mud', content: muddata });
             }
         });
 
@@ -98,10 +101,8 @@ app.whenReady().then(async () => {
     // IPC 通信：命令发送请求
     ipcMain.on('telnet-send', (event, command) => {
         if (telnetClient) {
-            // 游戏命令
-            telnetClient.write(command + '\r\n', (err) => {
-                if (err) event.sender.send('telnet-error', err.message);
-            });
+            // 加载脚本管理模块
+            scriptManage.mutual(mainWindow, telnetClient, command);
         }
     });
 
