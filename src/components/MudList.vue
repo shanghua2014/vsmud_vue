@@ -224,10 +224,11 @@ const allowClicked = (card: any) => {
     emits('cardClicked', true);
 
     // 设置store
-    // const configStore = useConfigStore();
-    // configStore.setConfig(datas);
+    const configStore = useConfigStore();
+    configStore.setConfig(datas);
 
-    base.sendMessage({
+    // 连接mud服务器
+    base.connect({
         type: 'telnet',
         content: datas
     });

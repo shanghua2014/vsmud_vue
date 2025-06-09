@@ -94,7 +94,6 @@ const onConfirm = (value: string[]) => {
     selectedCategories.value = value;
 };
 
-// 接收来自vscode扩展的消息
 onMounted(() => {
     // new Base().postMessage({ type: 'getAccount', content: '' });
     window.electronAPI.send('siteList', 1);

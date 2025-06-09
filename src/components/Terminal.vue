@@ -101,8 +101,9 @@ onMounted(() => {
     // 监听 Telnet 数据（显示到终端）
     window.electronAPI.on('telnet-data', (data: any) => {
         const { content, type } = data;
+        // console.log('content', content);
         if (terminal.value && type === 'mud') {
-            terminal.value.write(`${content}\r\n`);
+            // terminal.value.write(`${content}\r\n`);
             logic.termWrite(terminal, content);
         }
         // if (type === 'client') {

@@ -61,7 +61,7 @@ app.whenReady().then(async () => {
     // 加载脚本管理模块
     scriptManage.mutual(mainWindow);
 
-    // IPC 通信：监听渲染进程的 Telnet 连接请求
+    // IPC 通信：连接请求
     ipcMain.on('telnet-connect', async (event, config) => {
         const { ip, port } = config.content;
         telnetClient = createConnection(
@@ -78,6 +78,7 @@ app.whenReady().then(async () => {
         // 监听 Telnet 服务器返回的数据，并转发给渲染进程
         telnetClient.on('data', (data) => {
             if (mainWindow) {
+                console.log(data.toString());
                 mainWindow.webContents.send('telnet-data', { type: 'mud', content: data.toString() });
             }
         });
@@ -94,9 +95,10 @@ app.whenReady().then(async () => {
         });
     });
 
-    // IPC 通信：监听渲染进程的 Telnet 命令发送请求
+    // IPC 通信：命令发送请求
     ipcMain.on('telnet-send', (event, command) => {
         if (telnetClient) {
+            // 游戏命令
             telnetClient.write(command + '\r\n', (err) => {
                 if (err) event.sender.send('telnet-error', err.message);
             });

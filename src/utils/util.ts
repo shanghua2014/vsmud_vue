@@ -16,12 +16,15 @@ declare global {
 
 // 公共类库
 export class Base {
-    // 登录界面数据交互      
+    // 登录界面数据交互
     public sendSiteList(msg: Message) {
         window.electronAPI.send('siteList', msg);
     }
-    public sendMessage(msg: Message) {
-        window.electronAPI.send('telnet-connect', msg); 
+    public connect(msg: Message) {
+        window.electronAPI.send('telnet-connect', msg);
+    }
+    public sendMessage(cmd: string) {
+        window.electronAPI.send('telnet-send', cmd);
     }
 }
 
@@ -41,35 +44,26 @@ export class xTermLoginc {
 
     public termWrite(terminal: any, msg: any) {
         terminal.value.write(`${msg}`);
+        console.log('写入数据：', msg);
         const configStore = useConfigStore();
         if (/((你|您)的英文名)|(人物请输入new。)/.test(msg)) {
             const account = configStore.configInfo?.account.trim();
             if (account) {
-                setTimeout(() => {
-                    console.log('发送账号');
-                    this.base.sendMessage({
-                        type: 'command',
-                        content: account
-                    });
-                }, 1000);
+                console.log('发送账号', account);
+                this.base.sendMessage(account);
             }
         }
         if (/，请输入密码/.test(msg)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
-                this.base.sendMessage({
-                    type: 'command',
-                    content: password
-                });
+                console.log('发送密码', password);
+                this.base.sendMessage(password);
             }
         }
         if (/即将开始检测你的客户端/.test(msg)) {
             const password = configStore.configInfo?.password.trim();
             if (password) {
-                this.base.sendMessage({
-                    type: 'command',
-                    content: 'y'
-                });
+                this.base.sendMessage('y');
             }
         }
     }
