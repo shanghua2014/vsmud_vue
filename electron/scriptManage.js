@@ -3,9 +3,9 @@ import { createRequire } from 'module';
 import fs from 'fs/promises';
 import path from 'path';
 import axios from 'axios';
-
+import { Utils } from '../utils/utils.js';
 const require = createRequire(import.meta.url);
-// 替换为更短的变量名
+
 const loadedMods = new Set();
 
 /**
@@ -79,23 +79,24 @@ export const files = {
         });
     },
     getFullme: async (filename) => {
-        console.log('html');
         const fullmeDir = path.join(process.cwd(), 'fullme');
-        if (!fs.existsSync(fullmeDir)) {
-            fs.mkdirSync(fullmeDir);
-        }
+        // 使用异步方法确保 fullmeDir 存在
+        await fs.mkdir(fullmeDir, { recursive: true });
         const timestamp = Date.now().toString();
-        const subdir = path.join(fullmeDir, timestamp);
-        fs.mkdirSync(subdir);
+        // const subdir = path.join(fullmeDir, timestamp);
+        // 使用异步方法确保 subdir 存在
+        // await fs.mkdir(subdir, { recursive: true });
         let fullme = {
             name: timestamp,
             data: []
         };
         for (let i = 1; i <= 4; i++) {
             try {
+                console.log(filename);
                 const url = `http://fullme.pkuxkx.net/robot.php?filename=${filename}`;
                 const response = await axios.get(url, { responseType: 'text' });
                 const html = response.data;
+                console.log('html: ', html);
 
                 // 使用正则表达式匹配 img 标签的 src 属性
                 const imgSrcMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
@@ -103,13 +104,14 @@ export const files = {
                     throw new Error('未在 HTML 中找到 img 标签');
                 }
                 const imgSrc = imgSrcMatch[1];
+                console.log('imgUrl: ', imgUrl);
                 const imgUrl = new URL(imgSrc, url).href;
-
+                console.log('imgUrl: ', imgUrl);
                 const imgResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
                 const buffer = Buffer.from(imgResponse.data, 'binary');
                 fullme.data[i - 1] = buffer.toString('base64');
                 const imageFilename = `${i}.jpg`;
-                const filepath = path.join(subdir, imageFilename);
+                const filepath = path.join(fullmeDir, imageFilename);
                 await fs.writeFile(filepath, buffer);
             } catch (error) {
                 console.error(`Error downloading image ${i}:`, error.message);
@@ -125,9 +127,32 @@ export const scriptManage = {
      * @param {*} mainWindow 主窗口
      */
     mutual: (mainWindow, telnetClient, command) => {
+        if (command.type === 'script') {
+            const Triggers = command.content;
+            console.log('Triggers:');
+            console.log(JSON.parse(Triggers, Utils.deserialize));
+            // const Triggers = JSON.parse(command.content).Triggers;
+            // Triggers.forEach((element) => {
+            //     console.log(element.cmd);
+            //     console.log(element.reg);
+            // });
+            return;
+        }
+        // mud命令
+        if (!/^#/.test(command)) {
+            telnetClient.write(command + '\r\n');
+            return;
+        }
+
         const keywords = ['#load', '#re', '#show', '#set'];
         const keywordHandlers = {
-            '#show': (command) => {
+            '#show': async (command) => {
+                let muddata = command;
+                if (/^http:\/\/fullme\.pkuxkx\.net\/robot\.php\?filename=\d+/.test(muddata)) {
+                    // http://fullme.pkuxkx.net/robot.php?filename=1749520803470507
+                    muddata = await files.getFullme(muddata.split('=')[1]);
+                    console.log('触发 fullme 2', muddata);
+                }
                 mainWindow.webContents.send('telnet-data', { type: 'test', content: command });
                 return;
             },
@@ -140,8 +165,10 @@ export const scriptManage = {
 
                     if (!result.canceled && result.filePaths.length > 0) {
                         const selectedFilePath = result.filePaths[0];
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: selectedFilePath });
-                        require(selectedFilePath);
+                        const scripts = require(selectedFilePath);
+                        mainWindow.webContents.send('telnet-data', { type: 'mud', content: selectedFilePath + '\r\n' });
+                        console.log('scripts.Triggers: ', scripts.Triggers);
+                        mainWindow.webContents.send('telnet-data', { type: 'client', content: JSON.stringify(scripts.Triggers, Utils.serialize) });
                         loadedMods.add(selectedFilePath);
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
@@ -181,51 +208,5 @@ export const scriptManage = {
                 }
             }
         }
-
-        // 游戏命令
-        if (!/^#/.test(command)) {
-            telnetClient.write(command + '\r\n');
-        }
-
-        // 加载文件
-        // if (command === '#load') {
-        //     try {
-        //         const result = await dialog.showOpenDialog({
-        //             properties: ['openFile'],
-        //             filters: [{ name: 'JavaScript Files', extensions: ['js'] }]
-        //         });
-
-        //         if (!result.canceled && result.filePaths.length > 0) {
-        //             const selectedFilePath = result.filePaths[0];
-        //             mainWindow.webContents.send('telnet-data', { type: 'client', content: selectedFilePath });
-        //             require(selectedFilePath);
-        //             loadedMods.add(selectedFilePath);
-        //             console.log(`已成功执行文件: ${selectedFilePath}`);
-        //         }
-        //     } catch (err) {
-        //         console.error('加载文件时出错:', err);
-        //     }
-        // }
-        // 重载文件
-        // if (command === '#re') {
-        //     try {
-        //         // 修改变量名
-        //         for (const filePath of loadedMods) {
-        //             // 清除模块缓存
-        //             if (require.cache[require.resolve(filePath)]) {
-        //                 delete require.cache[require.resolve(filePath)];
-        //             }
-        //             // 重新加载模块
-        //             require(filePath);
-        //             console.log(`已成功重载文件: ${filePath}`);
-        //         }
-        //     } catch (err) {
-        //         console.error('重载文件时出错:', err);
-        //     }
-        // }
-        // if (.test(cmd)) {
-
-        // }
-        // });
     }
 };

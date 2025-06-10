@@ -69,7 +69,7 @@
 <script lang="ts" setup>
 import { ref, defineProps, watch, onMounted } from 'vue';
 import { Document } from '@element-plus/icons-vue'; // 导入图标组件
-import { Base } from '../utils/util';
+import { Base } from '../common/base';
 import type { DrawerProps } from 'element-plus';
 
 // 引入 defineEmits

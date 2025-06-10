@@ -10,6 +10,7 @@ declare global {
         electronAPI: {
             send: (channel: string, ...args: any[]) => void;
             on: (channel: string, listener: (...args: any[]) => void) => void;
+            off: (channel: string, listener: (...args: any[]) => void) => void;
         };
     }
 }
@@ -19,9 +20,15 @@ export class Base {
     // 登录界面数据交互
     public sendSiteList(msg: Message) {
         window.electronAPI.send('siteList', msg);
+        setTimeout(() => {
+            window.electronAPI.off('siteList', (msg: Message) => {});
+        }, 3000);
     }
     public connect(msg: Message) {
         window.electronAPI.send('telnet-connect', msg);
+        setTimeout(() => {
+            window.electronAPI.off('telnet-connect', (msg: Message) => {});
+        }, 3000);
     }
     public sendMessage(cmd: string) {
         window.electronAPI.send('telnet-send', cmd);
@@ -44,6 +51,13 @@ export class xTermLoginc {
 
     public termWrite(terminal: any, data: any) {
         const { content, type } = data;
+        // 处理 # 命令
+        if (type === 'client') {
+            console.log('客户端数据：', content);
+            window.electronAPI.send('telnet-send', { type: 'script', content: content });
+            return;
+        }
+
         terminal.value.write(`${content}`);
         console.log('写入数据：', content);
         const configStore = useConfigStore();

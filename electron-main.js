@@ -19,7 +19,7 @@ const createWindow = () => {
     mainWindow = new BrowserWindow({
         // 默认窗口标题，如果由loadURL()加载的HTML文件中含有标签<title>，此属性将被忽略。
         title: 'Electron + Vue3',
-        minWidth: 1224,
+        minWidth: 800,
         minHeight: screen.getPrimaryDisplay().workAreaSize.height,
         maxWidth: screen.getPrimaryDisplay().workAreaSize.width,
         // 修正拼写错误 maxheight 为 maxHeight
@@ -76,10 +76,11 @@ app.whenReady().then(async () => {
         telnetClient.on('data', async (data) => {
             if (mainWindow) {
                 // console.log(data);
-                const muddata = data.toString();
-                console.log(muddata);
-                if (/^http:\/\/fullme\.pkuxkx\.net/.test(muddata)) {
-                    // http://fullme.pkuxkx.net/robot.php?filename=1749457537780159
+                let muddata = data.toString();
+                console.log('muddata: ', muddata);
+                if (/http:\/\/fullme\.pkuxkx\.net\/robot\.php\?filename=\d+/.test(muddata)) {
+                    // http://fullme.pkuxkx.net/robot.php?filename=1749520803470507
+                    console.log('触发 fullme 1');
                     muddata = await files.getFullme(muddata.split('=')[1]);
                 }
                 mainWindow.webContents.send('telnet-data', { type: 'mud', content: muddata });
