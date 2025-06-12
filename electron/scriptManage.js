@@ -7,6 +7,7 @@ import { Utils } from '../utils/utils.js';
 const require = createRequire(import.meta.url);
 
 const loadedMods = new Set();
+const triggerMods = new Set();
 
 /**
  * 递归读取目录下所有文件内容
@@ -122,22 +123,27 @@ export const files = {
 };
 
 export const scriptManage = {
+    getTriggers: async (mainWindow) => {
+        return triggerMods;
+    },
     /**
      * 互操作
      * @param {*} mainWindow 主窗口
      */
     mutual: (mainWindow, telnetClient, command) => {
-        if (command.type === 'script') {
-            const Triggers = command.content;
-            console.log('Triggers:');
-            console.log(JSON.parse(Triggers, Utils.deserialize));
-            // const Triggers = JSON.parse(command.content).Triggers;
-            // Triggers.forEach((element) => {
-            //     console.log(element.cmd);
-            //     console.log(element.reg);
-            // });
-            return;
-        }
+        // 触发脚本
+        // if (command.type === 'script') {
+        //     const Triggers = command.content;
+        //     const triggers = JSON.parse(Triggers, Utils.deserialize);
+        //     triggers.forEach((element) => {
+        //         if (typeof element.cmd == 'function') {
+        //             element.cmd();
+        //         }
+        //         element.reg
+        //     });
+        //     return;
+        // }
+
         // mud命令
         if (!/^#/.test(command)) {
             telnetClient.write(command + '\r\n');
@@ -167,9 +173,10 @@ export const scriptManage = {
                         const selectedFilePath = result.filePaths[0];
                         const scripts = require(selectedFilePath);
                         mainWindow.webContents.send('telnet-data', { type: 'mud', content: selectedFilePath + '\r\n' });
-                        console.log('scripts.Triggers: ', scripts.Triggers);
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: JSON.stringify(scripts.Triggers, Utils.serialize) });
-                        loadedMods.add(selectedFilePath);
+                        const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
+                        triggerMods.add(scripts.Triggers);
+                        mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
+                        loadedMods.add(scripts.Trigger);
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
                 } catch (err) {

@@ -5,7 +5,7 @@ export const Utils = {
      * @returns String
      * @example const serializedData = JSON.stringify(原数据, Utils.serialize);
      */
-    serialize: (value) => {
+    serialize: (key, value) => {
         if (value instanceof RegExp) {
             // 将正则表达式转换为字符串
             return value.toString();
@@ -22,7 +22,7 @@ export const Utils = {
      * @returns Object
      * @example const deserializedData = JSON.parse(序列化后的数据, Utils.deserialize);
      */
-    deserialize: (value) => {
+    deserialize: (key, value) => {
         if (typeof value === 'string') {
             // 检查是否为正则表达式字符串
             if (/^\/.*\/[gimuy]*$/.test(value)) {

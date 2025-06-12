@@ -50,7 +50,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Edit, CloseBold, Plus, Delete } from '@element-plus/icons-vue';
-import { Base } from '@/common/base';
+import { Base } from '@/common/common';
 import { useConfigStore } from '@/stores/store';
 
 // 是否为创建状态

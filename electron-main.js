@@ -78,6 +78,21 @@ app.whenReady().then(async () => {
                 // console.log(data);
                 let muddata = data.toString();
                 console.log('muddata: ', muddata);
+                const triggers = await scriptManage.getTriggers();
+                triggers.forEach((element) => {
+                    element.forEach((item) => {
+                        console.log(item.reg);
+                        const r = new RegExp(item.reg).test(muddata); 
+                        console.log(r);
+                        // if (item.reg.test(muddata)) {
+                        //     if (typeof item.cmd == 'function') {
+                        //         item.cmd();
+                        //     } else {
+                        //         telnetClient.write(item.cmd + '\r\n');
+                        //     }
+                        // }
+                    });
+                });
                 if (/http:\/\/fullme\.pkuxkx\.net\/robot\.php\?filename=\d+/.test(muddata)) {
                     // http://fullme.pkuxkx.net/robot.php?filename=1749520803470507
                     console.log('触发 fullme 1');

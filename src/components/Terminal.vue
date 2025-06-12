@@ -16,7 +16,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
-import { Base, xTermLoginc } from '@/common/base';
+import { Base, xTermLoginc } from '@/common/common';
 
 // 声明全局 window 对象的自定义属性
 declare global {

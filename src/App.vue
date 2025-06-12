@@ -27,7 +27,7 @@ import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
 import Fullme from './components/Fullme.vue';
 import { onMounted, ref, onUnmounted } from 'vue';
-import { Base } from './common/base';
+import { Base } from './common/common';
 
 // 声明全局 window 对象的自定义属性
 declare global {
