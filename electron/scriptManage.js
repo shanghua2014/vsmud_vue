@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Utils } from '../utils/utils.js';
 const require = createRequire(import.meta.url);
 
-const loadedMods = new Set();
+const scriptFilePathMods = new Set();
 const triggerMods = new Set();
 
 /**
@@ -176,25 +176,39 @@ export const scriptManage = {
                         const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
                         triggerMods.add(scripts.Triggers);
                         mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
-                        loadedMods.add(scripts.Trigger);
+                        // 修正此处为 scripts.Triggers
+                        scriptFilePathMods.add(selectedFilePath);
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
                 } catch (err) {
                     console.error('加载文件时出错:', err);
                 }
             },
-            '#re': () => {
+            '#re': async () => {
                 try {
-                    // 修改变量名
-                    for (const filePath of loadedMods) {
-                        // 清除模块缓存
-                        if (require.cache[require.resolve(filePath)]) {
-                            delete require.cache[require.resolve(filePath)];
-                        }
-                        // 重新加载模块
-                        require(filePath);
-                        console.log(`已成功重载文件: ${filePath}`);
+                    console.log(scriptFilePathMods);
+                    if (scriptFilePathMods.size === 0) {
+                        console.error('没有可重载的文件路径');
+                        return;
                     }
+                    scriptFilePathMods.forEach((file) => {
+                        // 删除文件缓存
+                        if (require.cache[require.resolve(file)]) {
+                            console.log('删除文件缓存')
+                            delete require.cache[require.resolve(file)];
+                        }
+                        // 重新加载文件
+                        const scripts = require(file);
+                        triggerMods.clear();
+                        // 添加新的 triggerMods
+                        triggerMods.add(scripts.Triggers);
+
+                        mainWindow.webContents.send('telnet-data', { type: 'mud', content: `已重新加载文件: ${file}\r\n` });
+                        const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
+                        console.log(ccc);
+                        mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
+                        console.log(`已成功重载文件: ${file}`);
+                    });
                 } catch (err) {
                     console.error('重载文件时出错:', err);
                 }

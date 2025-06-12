@@ -8,7 +8,7 @@ export const Triggers = [
     },
     {
         type: 'tri',
-        reg: /1212/,
+        reg: /5555/,
         cmd: 'hehe'
     }
 ];
