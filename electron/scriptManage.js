@@ -1,10 +1,10 @@
 import { ipcMain, dialog } from 'electron/main';
-import { createRequire } from 'module';
+// import { createRequire } from 'module';
 import fs from 'fs/promises';
 import path from 'path';
 import axios from 'axios';
 import { Utils } from '../utils/utils.js';
-const require = createRequire(import.meta.url);
+// const require = createRequire(import.meta.url);
 
 const scriptFilePathMods = new Set();
 const triggerMods = new Set();
@@ -171,12 +171,13 @@ export const scriptManage = {
 
                     if (!result.canceled && result.filePaths.length > 0) {
                         const selectedFilePath = result.filePaths[0];
-                        const scripts = require(selectedFilePath);
+                        // 使用动态 import 加载 ES 模块
+                        const scripts = await import(`file://${selectedFilePath}`);
+
                         mainWindow.webContents.send('telnet-data', { type: 'mud', content: selectedFilePath + '\r\n' });
                         const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
                         triggerMods.add(scripts.Triggers);
                         mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
-                        // 修正此处为 scripts.Triggers
                         scriptFilePathMods.add(selectedFilePath);
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
@@ -191,21 +192,19 @@ export const scriptManage = {
                         console.error('没有可重载的文件路径');
                         return;
                     }
-                    scriptFilePathMods.forEach((file) => {
-                        // 删除文件缓存
-                        if (require.cache[require.resolve(file)]) {
-                            console.log('删除文件缓存')
-                            delete require.cache[require.resolve(file)];
-                        }
-                        // 重新加载文件
-                        const scripts = require(file);
-                        triggerMods.clear();
+
+                    triggerMods.clear();
+                    scriptFilePathMods.forEach(async (file) => {
+                        // 生成时间戳参数
+                        const timestamp = Date.now();
+                        // 重新加载文件，添加时间戳参数
+                        const scripts = await import(`file://${file}?t=${timestamp}`);
+
                         // 添加新的 triggerMods
                         triggerMods.add(scripts.Triggers);
 
                         mainWindow.webContents.send('telnet-data', { type: 'mud', content: `已重新加载文件: ${file}\r\n` });
                         const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
-                        console.log(ccc);
                         mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
                         console.log(`已成功重载文件: ${file}`);
                     });
