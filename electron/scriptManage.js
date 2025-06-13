@@ -7,7 +7,7 @@ import { Utils } from '../utils/utils.js';
 // const require = createRequire(import.meta.url);
 
 const scriptFilePathMods = new Set();
-const triggerMods = new Set();
+const triggerMods = new Map();
 
 /**
  * 递归读取目录下所有文件内容
@@ -150,7 +150,7 @@ export const scriptManage = {
             return;
         }
 
-        const keywords = ['#load', '#re', '#show', '#set'];
+        const keywords = ['#load', '#reload', '#unload', '#show', '#set'];
         const keywordHandlers = {
             '#show': async (command) => {
                 let muddata = command;
@@ -170,22 +170,30 @@ export const scriptManage = {
                     });
 
                     if (!result.canceled && result.filePaths.length > 0) {
+                        console.log('选择的文件路径:', result.filePaths);
                         const selectedFilePath = result.filePaths[0];
                         // 使用动态 import 加载 ES 模块
                         const scripts = await import(`file://${selectedFilePath}`);
 
+                        // 记录文件路径
                         mainWindow.webContents.send('telnet-data', { type: 'mud', content: selectedFilePath + '\r\n' });
-                        const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
-                        triggerMods.add(scripts.Triggers);
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
                         scriptFilePathMods.add(selectedFilePath);
+
+                        // 获取文件名，用于后续判断是否需要重载
+                        let fileName = Utils.getLastStr(selectedFilePath, '\\');
+                        fileName = Utils.getFirstStr(fileName, '.');
+
+                        // 添加新的 triggerMods
+                        triggerMods.set(fileName, scripts.Triggers);
+                        const serializeDatas = JSON.stringify(triggerMods, Utils.serialize);
+                        mainWindow.webContents.send('telnet-data', { type: 'client', content: serializeDatas });
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
                 } catch (err) {
                     console.error('加载文件时出错:', err);
                 }
             },
-            '#re': async () => {
+            '#reload': async () => {
                 try {
                     console.log(scriptFilePathMods);
                     if (scriptFilePathMods.size === 0) {
@@ -193,23 +201,44 @@ export const scriptManage = {
                         return;
                     }
 
+                    // 清空Map中的所有模块
                     triggerMods.clear();
                     scriptFilePathMods.forEach(async (file) => {
+                        // 获取文件名，用于后续判断是否需要重载
+                        let fileName = Utils.getLastStr(file, '\\');
+                        fileName = Utils.getFirstStr(fileName, '.');
+
                         // 生成时间戳参数
                         const timestamp = Date.now();
                         // 重新加载文件，添加时间戳参数
                         const scripts = await import(`file://${file}?t=${timestamp}`);
 
                         // 添加新的 triggerMods
-                        triggerMods.add(scripts.Triggers);
+                        triggerMods.set(fileName, scripts.Triggers);
 
                         mainWindow.webContents.send('telnet-data', { type: 'mud', content: `已重新加载文件: ${file}\r\n` });
-                        const ccc = JSON.stringify(scripts.Triggers, Utils.serialize);
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: ccc });
+                        const serializeDatas = JSON.stringify(scripts.Triggers, Utils.serialize);
+                        mainWindow.webContents.send('telnet-data', { type: 'client', content: serializeDatas });
                         console.log(`已成功重载文件: ${file}`);
                     });
                 } catch (err) {
                     console.error('重载文件时出错:', err);
+                }
+            },
+            '#unload': async () => {
+                try {
+                    if (scriptFilePathMods.size === 0) {
+                        console.error('没有可卸载的文件路径');
+                        return;
+                    }
+                    // 清空 triggerMods 中的所有模块
+                    triggerMods.clear();
+                    // 清空记录文件路径的 scriptFilePathMods
+                    scriptFilePathMods.clear();
+                    mainWindow.webContents.send('telnet-data', { type: 'mud', content: '已卸载所有加载的模块\r\n' });
+                    console.log('已成功卸载所有加载的模块');
+                } catch (err) {
+                    console.error('卸载文件时出错:', err);
                 }
             }
         };
