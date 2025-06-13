@@ -1,4 +1,4 @@
-export const Triggers2 = [
+export const Triggers = [
     {
         type: 'tri',
         reg: /你「.*」奸笑了几声。/,
@@ -8,7 +8,7 @@ export const Triggers2 = [
     },
     {
         type: 'tri',
-        reg: /xxxxx/,
+        reg: /3333/,
         cmd: 'hehe'
     }
 ];

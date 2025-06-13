@@ -1,5 +1,28 @@
 export const Utils = {
     /**
+     * 字符串切割，取最后一个元素
+     * @param {*} str
+     * @param {*} symbol
+     * @returns String
+     * @example const lastStr = Utils.getLastStr('Hello, World', ','); // 输出: ' World'
+     */
+    getLastStr: (str, symbol) => {
+        const arr = str.split(symbol);
+        return arr[arr.length - 1];
+    },
+    /**
+     * 字符串切割，取最后一个元素
+     * @param {*} str
+     * @param {*} symbol
+     * @returns String
+     * @example const lastStr = Utils.getFirstStr('Hello, World', ','); // 输出: 'Hello'
+     */
+    getFirstStr: (str, symbol) => {
+        const arr = str.split(symbol);
+        return arr[0];
+    },
+
+    /**
      * 定义序列化函数
      * @param {*} value
      * @returns String
