@@ -127,22 +127,21 @@ export const scriptManage = {
         return triggerMods;
     },
     /**
-     * 互操作
+     * 发送命令
      * @param {*} mainWindow 主窗口
+     * @param {*} telnetClient telnet客户端
+     * @param {*} command 发送给telnet服务器的命令
+     * @param {*} type 类型 如果type为真，就给命令返回给vue
      */
-    mutual: (mainWindow, telnetClient, command) => {
-        // 触发脚本
-        // if (command.type === 'script') {
-        //     const Triggers = command.content;
-        //     const triggers = JSON.parse(Triggers, Utils.deserialize);
-        //     triggers.forEach((element) => {
-        //         if (typeof element.cmd == 'function') {
-        //             element.cmd();
-        //         }
-        //         element.reg
-        //     });
-        //     return;
-        // }
+    mutual: (mainWindow, telnetClient, command, type = false) => {
+        // 触发器执行的命令
+        if (type === 'triCmd') {
+            setTimeout(() => {
+                mainWindow.webContents.send('to-vue', { type: 'tri-cmd', content: command });
+                telnetClient.write(command+'\r\n');
+            }, 100);
+            return;
+        }
 
         // mud命令
         if (!/^#/.test(command)) {
@@ -159,7 +158,7 @@ export const scriptManage = {
                     muddata = await files.getFullme(muddata.split('=')[1]);
                     console.log('触发 fullme 2', muddata);
                 }
-                mainWindow.webContents.send('telnet-data', { type: 'test', content: command });
+                mainWindow.webContents.send('to-vue', { type: 'test', content: command });
                 return;
             },
             '#load': async () => {
@@ -176,7 +175,7 @@ export const scriptManage = {
                         const scripts = await import(`file://${selectedFilePath}`);
 
                         // 记录文件路径
-                        mainWindow.webContents.send('telnet-data', { type: 'mud', content: selectedFilePath + '\r\n' });
+                        mainWindow.webContents.send('to-vue', { type: 'mud', content: selectedFilePath + '\r\n' });
                         scriptFilePathMods.add(selectedFilePath);
 
                         // 获取文件名，用于后续判断是否需要重载
@@ -186,7 +185,7 @@ export const scriptManage = {
                         // 添加新的 triggerMods
                         triggerMods.set(fileName, scripts.Triggers);
                         const serializeDatas = JSON.stringify(triggerMods, Utils.serialize);
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: serializeDatas });
+                        mainWindow.webContents.send('to-vue', { type: 'client', content: serializeDatas });
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
                 } catch (err) {
@@ -216,9 +215,9 @@ export const scriptManage = {
                         // 添加新的 triggerMods
                         triggerMods.set(fileName, scripts.Triggers);
 
-                        mainWindow.webContents.send('telnet-data', { type: 'mud', content: `已重新加载文件: ${file}\r\n` });
+                        mainWindow.webContents.send('to-vue', { type: 'mud', content: `已重新加载文件: ${file}\r\n` });
                         const serializeDatas = JSON.stringify(scripts.Triggers, Utils.serialize);
-                        mainWindow.webContents.send('telnet-data', { type: 'client', content: serializeDatas });
+                        mainWindow.webContents.send('to-vue', { type: 'client', content: serializeDatas });
                         console.log(`已成功重载文件: ${file}`);
                     });
                 } catch (err) {
@@ -235,7 +234,7 @@ export const scriptManage = {
                     triggerMods.clear();
                     // 清空记录文件路径的 scriptFilePathMods
                     scriptFilePathMods.clear();
-                    mainWindow.webContents.send('telnet-data', { type: 'mud', content: '已卸载所有加载的模块\r\n' });
+                    mainWindow.webContents.send('to-vue', { type: 'mud', content: '已卸载所有加载的模块\r\n' });
                     console.log('已成功卸载所有加载的模块');
                 } catch (err) {
                     console.error('卸载文件时出错:', err);

@@ -77,20 +77,28 @@ app.whenReady().then(async () => {
             if (mainWindow) {
                 // console.log(data);
                 let muddata = data.toString();
+                // 触发命令
                 console.log('muddata: ', muddata);
                 const triggers = await scriptManage.getTriggers();
+                // 匹配触发
                 triggers.forEach((element) => {
                     element.forEach((item) => {
-                        console.log(item.reg);
-                        const r = new RegExp(item.reg).test(muddata); 
-                        console.log(r);
-                        // if (item.reg.test(muddata)) {
-                        //     if (typeof item.cmd == 'function') {
-                        //         item.cmd();
-                        //     } else {
-                        //         telnetClient.write(item.cmd + '\r\n');
-                        //     }
-                        // }
+                        const match = new RegExp(item.reg).test(muddata);
+                        let result = muddata.match(item.reg);
+                        // 获取匹配内容
+                        for (const i in result) {
+                            if (i == 1) {
+                                result = result[i];
+                                break;
+                            }
+                        }
+                        if (match) {
+                            if (typeof item.cmd == 'function') {
+                                scriptManage.mutual(mainWindow, telnetClient, item.cmd(result), 'triCmd');
+                            } else {
+                                scriptManage.mutual(mainWindow, telnetClient, item.cmd, 'triCmd');
+                            }
+                        }
                     });
                 });
                 if (/http:\/\/fullme\.pkuxkx\.net\/robot\.php\?filename=\d+/.test(muddata)) {
@@ -98,7 +106,7 @@ app.whenReady().then(async () => {
                     console.log('触发 fullme 1');
                     muddata = await files.getFullme(muddata.split('=')[1]);
                 }
-                mainWindow.webContents.send('telnet-data', { type: 'mud', content: muddata });
+                mainWindow.webContents.send('to-vue', { type: 'mud', content: muddata });
             }
         });
 

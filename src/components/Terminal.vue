@@ -24,6 +24,7 @@ declare global {
         electronAPI: {
             send: (channel: string, ...args: any[]) => void;
             on: (channel: string, listener: (...args: any[]) => void) => void;
+            off: (channel: string, listener: (...args: any[]) => void) => void;
         };
     }
 }
@@ -99,16 +100,10 @@ onMounted(() => {
     });
 
     // 监听 Telnet 数据（显示到终端）
-    window.electronAPI.on('telnet-data', (data: any) => {
-        // const { content, type } = data;
+    window.electronAPI.on('to-vue', (data: any) => {
         if (terminal.value) {
-            // if (type === 'mud') {
             logic.termWrite(terminal, data);
-            // }
         }
-        // if (type === 'client') {
-        //     sendCommand(content, terminal, type);
-        // }
     });
 
     // 监听连接断开事件
@@ -143,16 +138,10 @@ const handleInput = () => {
  * @param terminal - 终端实例
  */
 const sendCommand = (command: string, terminal: any, type?: any) => {
-    // 定义不同颜色的 ANSI 转义序列，这里使用绿色
-    const blueColor = '\x1b[0;40m\x1b[1;44m';
-    const greenColor = '\x1b[0;40m\x1b[1;32m';
-    const yellowColor = '\x1b[0;40m\x1b[1;33m';
-    const resetColor = '\x1b[0m';
-
     // 加载脚本文件
-    let cmd = `${greenColor}[ ${command} ]${resetColor}\r\n`;
+    let cmd = `${base.colors.green}[ ${command} ]${base.colors.reset}\r\n`;
     if (type === 'client') {
-        cmd = `${blueColor}${command}${resetColor}\r\n`;
+        cmd = `${base.colors.blue}${command}${base.colors.reset}\r\n`;
         let sp: Array<string> | string = command.split('\\');
         sp = sp[sp.length - 1];
         // 触发事件并传递 command 变量

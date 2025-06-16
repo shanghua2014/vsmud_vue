@@ -17,6 +17,15 @@ declare global {
 
 // 公共类库
 export class Base {
+    /**
+     * 定义不同颜色的 ANSI 转义序列
+     */
+    public colors = {
+        blue: '\x1b[0;40m\x1b[1;44m',
+        green: '\x1b[0;40m\x1b[1;32m',
+        yellow: '\x1b[0;40m\x1b[1;33m',
+        reset: '\x1b[0m'
+    };
     // 登录界面数据交互
     public sendSiteList(msg: Message) {
         window.electronAPI.send('siteList', msg);
@@ -50,12 +59,16 @@ export class xTermLoginc {
     }
 
     public termWrite(terminal: any, data: any) {
-        const { content, type } = data;
+        let { content, type } = data;
         // 处理 # 命令
         if (type === 'client') {
             console.log('客户端数据：', content);
             window.electronAPI.send('telnet-send', { type: 'script', content: content });
             return;
+        }
+
+        if (type == 'tri-cmd') {
+            content = `${this.base.colors.yellow} ${content} ${this.base.colors.reset}\r\n`;
         }
 
         terminal.value.write(`${content}`);

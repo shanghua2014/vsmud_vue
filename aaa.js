@@ -1,4 +1,4 @@
-import { Utils } from "./utils/utils.js";
-let a = 'test.js'
-a =a.split('.')
-console.log(a);
+var regex = /你(.*)大笑几声。/;
+var string = "你123大笑几声。";
+var result = string.match(regex);
+console.log(result[1]);
