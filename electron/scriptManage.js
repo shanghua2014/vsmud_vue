@@ -1,13 +1,16 @@
 import { ipcMain, dialog } from 'electron/main';
-// import { createRequire } from 'module';
 import fs from 'fs/promises';
 import path from 'path';
 import axios from 'axios';
 import { Utils } from '../utils/utils.js';
-// const require = createRequire(import.meta.url);
 
 const scriptFilePathMods = new Set();
 const triggerMods = new Map();
+
+// 全局变量
+global.data = {
+    account: ''
+};
 
 /**
  * 递归读取目录下所有文件内容
@@ -42,7 +45,45 @@ async function readAllFilesInDir(dirPath) {
 }
 
 export const files = {
-    getFile: async (mainWindow) => {
+    writeFileDatas: async (content) => {
+        const configDir = path.join(process.cwd(), 'config');
+        const filePath = path.join(configDir, `${global.data.account}.json`);
+        try {
+            await fs.writeFile(filePath, JSON.stringify(content, null, 2));
+            console.log(`文件 ${filePath} 保存成功`);
+        } catch (err) {
+            console.error('保存文件时出错:', err);
+        }
+    },
+    // 读取文件内容
+    readFileDatas: async (fileName) => {
+        const configDir = path.join(process.cwd(), 'config');
+        const result = {};
+        try {
+            // 读取目录下所有文件
+            const files = await fs.readdir(configDir);
+            for (const file of files) {
+                if (file.startsWith(fileName)) {
+                    const fullPath = path.join(configDir, file);
+                    try {
+                        // 读取文件内容
+                        const content = await fs.readFile(fullPath, 'utf-8');
+                        // 去掉文件内容中的 \r 和 \n
+                        const cleanedContent = content.replace(/[\r\n]/g, '');
+                        result[file] = cleanedContent;
+                    } catch (err) {
+                        console.error(`读取文件 ${fullPath} 出错:`, err);
+                    }
+                    break;
+                }
+            }
+        } catch (err) {
+            console.error(`读取目录 ${configDir} 出错:`, err);
+        }
+        return result;
+    },
+    // 站点列表
+    siteList: async (mainWindow) => {
         ipcMain.on('siteList', async (event, cmd) => {
             const configDir = path.join(process.cwd(), 'config');
             const { content } = cmd;
@@ -60,10 +101,12 @@ export const files = {
                 try {
                     // 确保 config 目录存在
                     await fs.mkdir(configDir, { recursive: true });
-                    const filePath = path.join(configDir, `${content.account}.json`);
-                    // 将 cmd.content 转换为 JSON 字符串并写入文件
-                    await fs.writeFile(filePath, JSON.stringify(content, null, 2));
-                    console.log(`文件 ${filePath} 保存成功`);
+                    // const filePath = path.join(configDir, `${content.account}.json`);
+                    // global.data.account = content.account;
+                    // // 将 cmd.content 转换为 JSON 字符串并写入文件
+                    // await fs.writeFile(filePath, JSON.stringify(content, null, 2));
+                    // console.log(`文件 ${filePath} 保存成功`);
+                    files.writeFileDatas(content)
                 } catch (err) {
                     console.error('保存文件时出错:', err);
                 }
@@ -138,7 +181,7 @@ export const scriptManage = {
         if (type === 'triCmd') {
             setTimeout(() => {
                 mainWindow.webContents.send('to-vue', { type: 'tri-cmd', content: command });
-                telnetClient.write(command+'\r\n');
+                telnetClient.write(command + '\r\n');
             }, 100);
             return;
         }
@@ -186,6 +229,15 @@ export const scriptManage = {
                         triggerMods.set(fileName, scripts.Triggers);
                         const serializeDatas = JSON.stringify(triggerMods, Utils.serialize);
                         mainWindow.webContents.send('to-vue', { type: 'client', content: serializeDatas });
+                        const configDatas = JSON.parse(files.readFileDatas(global.data.account));
+                        if (configDatas.scripts) {
+                            if (!configDatas.scripts.includes(selectedFilePath)) {
+                                configDatas.scripts.push(selectedFilePath);
+                            }
+                        } else {
+                            configDatas.scripts[0] = selectedFilePath;
+                        }
+                        file.writeFileDatas(configDatas)
                         console.log(`已成功执行文件: ${selectedFilePath}`);
                     }
                 } catch (err) {
