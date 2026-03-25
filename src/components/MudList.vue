@@ -18,6 +18,7 @@
                     <p class="yellow">账号：{{ card.account }}</p>
                     <p class="blueviolet">密码：{{ card.password }}</p>
                     <p>角色：{{ card.name }}</p>
+                    <p class="chartreuse">编码：{{ card.charset === 'utf8' ? 'UTF-8' : 'GBK/GB18030' }}</p>
                 </template>
                 <template v-else>
                     <input v-model="card.ip" placeholder="服务器" />
@@ -25,6 +26,10 @@
                     <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
                     <input v-model="card.password" placeholder="密码（非必填）" />
                     <input v-model="card.name" placeholder="角色" />
+                    <el-select v-model="card.charset" placeholder="文本编码" size="small" style="width: 100%; margin-top: 4px">
+                        <el-option label="GBK/GB18030（国内 MUD 常用）" value="gb18030" />
+                        <el-option label="UTF-8" value="utf8" />
+                    </el-select>
                 </template>
                 <div class="edit-box pa" v-if="!card.isEditing && cardClick">
                     <!-- 删除按钮 -->
@@ -47,7 +52,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Edit, CloseBold, Plus, Delete } from '@element-plus/icons-vue';
 import { Base } from '@/common/common';
@@ -70,6 +75,8 @@ interface CardModel {
     account: string;
     password: string;
     name: string;
+    /** 与 common SiteCard.charset 一致 */
+    charset?: 'gb18030' | 'utf8';
 }
 
 // 定义 props 接收父级传递的 mudlist 数据
@@ -89,7 +96,19 @@ const props = defineProps<{
 //         name: '示例角色'
 //     }
 // ]);
-const cards = ref<typeof props.mudlist>(props.mudlist);
+const cards = ref<CardModel[]>([]);
+
+watch(
+    () => props.mudlist,
+    (list) => {
+        cards.value = (list ?? []).map((c) => ({
+            ...c,
+            charset: c.charset ?? 'gb18030',
+            isEditing: Boolean(c.isEditing)
+        }));
+    },
+    { deep: true, immediate: true }
+);
 
 const base = new Base();
 
@@ -113,7 +132,8 @@ const add = () => {
         port: '',
         account: '',
         password: '',
-        name: ''
+        name: '',
+        charset: 'gb18030'
     });
     allowClick.value = false;
     isCreated.value = true;
@@ -133,7 +153,8 @@ const getTrimData = (card: any) => {
         port: card.port.trim(),
         account: card.account.trim(),
         password: card.password.trim(),
-        name: card.name.trim()
+        name: card.name.trim(),
+        charset: (card.charset as CardModel['charset']) || 'gb18030'
     };
 };
 
@@ -219,7 +240,8 @@ const allowClicked = (card: any) => {
         port: card.port,
         account: card.account,
         password: card.password,
-        name: card.name
+        name: card.name,
+        charset: card.charset ?? 'gb18030'
     };
     emits('cardClicked', true);
 
@@ -240,41 +262,6 @@ const allowClicked = (card: any) => {
 const emits = defineEmits<{
     (event: 'cardClicked', data: any): void;
 }>();
-
-onMounted(() => {
-    // window.addEventListener('message', (event) => {
-    //     const message = event.data;
-    //     try {
-    //         if (message.type === 'getConfig') {
-    //             console.log(message.datas);
-    //             message.datas = JSON.parse(message.datas);
-    //             const { ip, account } = message.datas;
-    //             if (!ip) {
-    //                 // 创建模式
-    //                 isCreated.value = true;
-    //                 // 禁止点击卡片
-    //                 allowClick.value = false;
-    //                 cards.value.push({
-    //                     isEditing: false,
-    //                     title: '',
-    //                     ip: '',
-    //                     port: '',
-    //                     account: account,
-    //                     password: '',
-    //                     name: ''
-    //                 });
-    //             } else {
-    //                 // 正常模式
-    //                 isCreated.value = false;
-    //                 allowClick.value = true;
-    //                 cards.value.push(message.datas);
-    //             }
-    //         }
-    //     } catch (error) {
-    //         console.log('error', error);
-    //     }
-    // });
-});
 </script>
 
 <style lang="scss" scoped>

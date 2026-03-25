@@ -8,8 +8,12 @@ export default defineConfig({
     base: './', // 设置基本路径
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'src') // 设置 `@` 为 `src` 目录的别名
+            '@': path.resolve(__dirname, 'src'), // 设置 `@` 为 `src` 目录的别名
+            buffer: 'buffer'
         }
+    },
+    optimizeDeps: {
+        include: ['buffer', 'iconv-lite']
     },
     server: {
         port: 9000, // 开发服务器端口

@@ -1,4 +1,19 @@
 <template>
+    <div v-if="showYnPrompt || showMfPrompt || showHelpStartPrompt || showEmailPrompt" class="mud-yn-actions pa">
+        <template v-if="showYnPrompt">
+            <el-button size="small" type="primary" @click="pickYn('y')">y</el-button>
+            <el-button size="small" type="primary" plain @click="pickYn('n')">n</el-button>
+        </template>
+        <template v-if="showMfPrompt">
+            <el-button size="small" type="primary" @click="pickMf('m')">m</el-button>
+            <el-button size="small" type="primary" plain @click="pickMf('f')">f</el-button>
+        </template>
+        <template v-if="showHelpStartPrompt">
+            <el-button size="small" type="primary" @click="pickHelp('help start')">help start</el-button>
+            <el-button size="small" type="primary" plain @click="pickHelp('help start2')">help start2</el-button>
+        </template>
+        <el-button v-if="showEmailPrompt" size="small" type="primary" @click="pickEmail">Email</el-button>
+    </div>
     <el-menu
         :default-active="activeIndex"
         class="el-menu-demo pa"
@@ -67,17 +82,18 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, defineProps, watch, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { Document } from '@element-plus/icons-vue'; // 导入图标组件
 import { Base } from '../common/common';
 import type { DrawerProps } from 'element-plus';
 
-// 引入 defineEmits
-import { defineEmits } from 'vue';
-
 // 定义 props 接收 cmd 参数
 const props = defineProps<{
     cmd: string;
+    showYnPrompt?: boolean;
+    showMfPrompt?: boolean;
+    showHelpStartPrompt?: boolean;
+    showEmailPrompt?: boolean;
 }>();
 
 const qq = ref(false);
@@ -111,7 +127,7 @@ const options = [
 ];
 
 // 定义 emit 事件
-const emits = defineEmits(['checkboxChange', 'cancelSelection', 'confirmSelection']);
+const emits = defineEmits(['checkboxChange', 'cancelSelection', 'confirmSelection', 'ynChoice', 'mfChoice', 'helpChoice', 'emailChoice']);
 
 const base = new Base();
 const activeIndex = ref('1');
@@ -168,8 +184,24 @@ const confirm = () => {
     openSetting.value = false;
 };
 
+const pickYn = (v: 'y' | 'n') => {
+    emits('ynChoice', v);
+};
+
+const pickMf = (v: 'm' | 'f') => {
+    emits('mfChoice', v);
+};
+
+const pickHelp = (cmd: 'help start' | 'help start2') => {
+    emits('helpChoice', cmd);
+};
+
+const pickEmail = () => {
+    emits('emailChoice');
+};
+
 const handleSelect = (key: string, keyPath: string[]) => {
-    base.postMessage({ type: 'command', content: keyPath[2] });
+    base.sendMessage(keyPath[2] ?? key);
 };
 
 // 监听 props.cmd 的变化，将其赋值给新变量
@@ -229,6 +261,14 @@ ul.el-menu-demo {
     justify-content: center;
     z-index: 1;
     border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+}
+.mud-yn-actions {
+    display: flex;
+    right: 1px;
+    bottom: 64px;
+    z-index: 2;
+    gap: 6px;
+    align-items: center;
 }
 ul.el-menu--popup {
     padding: 0;

@@ -1,7 +1,24 @@
 <template>
     <div class="terminal-wrapper">
         <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
-        <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" placeholder="命令" ref="inputRef" class="terminal-input" />
+        <div class="account-action-float" v-if="accountAction">
+            <el-button size="small" type="primary" plain @click="runQuickAction(accountAction.command)">
+                {{ accountAction.label }}
+            </el-button>
+        </div>
+        <div class="quick-actions" v-if="otherQuickActions.length">
+            <el-button
+                v-for="action in otherQuickActions"
+                :key="action.id"
+                size="small"
+                type="primary"
+                plain
+                @click="runQuickAction(action)"
+            >
+                {{ action.label }}
+            </el-button>
+        </div>
+        <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" :placeholder="inputPlaceholder" ref="inputRef" class="terminal-input" />
         <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button" title="置底(alt+z)">
             <Bottom style="width: 31px; height: 1rem" />
         </el-button>
@@ -9,7 +26,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onUnmounted } from 'vue';
+import { computed, onMounted, ref, onUnmounted } from 'vue';
 import { ElInput, ElMessage, ElButton } from 'element-plus';
 import { Bottom } from '@element-plus/icons-vue';
 import { Terminal } from 'xterm';
@@ -17,17 +34,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
 import { Base, xTermLoginc } from '@/common/common';
-
-// 声明全局 window 对象的自定义属性
-declare global {
-    interface Window {
-        electronAPI: {
-            send: (channel: string, ...args: any[]) => void;
-            on: (channel: string, listener: (...args: any[]) => void) => void;
-            off: (channel: string, listener: (...args: any[]) => void) => void;
-        };
-    }
-}
+import { useConfigStore } from '@/stores/store';
 
 // 创建 xTerm 终端逻辑处理实例
 const logic = new xTermLoginc();
@@ -42,13 +49,24 @@ const terminal = ref<Terminal | null>(null);
 const inputBox = ref('');
 // 输入框组件引用
 const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
+const inputPlaceholder = ref('命令');
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
 
 // 定义 emit 事件，添加新事件 notifyParent
-const emits = defineEmits(['showDownward', 'menuCommand', 'sendCommandToChannel']);
+const emits = defineEmits(['showDownward', 'menuCommand', 'sendCommandToChannel', 'ynPrompt', 'mfPrompt', 'helpPrompt', 'emailPrompt']);
+
+type QuickAction = { id: string; label: string; command?: string; type?: 'command' | 'focus' };
+const quickActions = ref<QuickAction[]>([]);
+const accountAction = computed(() => quickActions.value.find((a) => a.id === 'send-account') ?? null);
+const otherQuickActions = computed(() => quickActions.value.filter((a) => a.id !== 'send-account'));
+const serverRawBuffer = ref('');
 
 let removeScrollListener: () => void;
+let onConnected: (() => void) | null = null;
+let onError: ((msg: string) => void) | null = null;
+let onData: ((data: { type: string; content: string }) => void) | null = null;
+let onDisconnected: (() => void) | null = null;
 
 // 组件挂载后执行初始化操作
 onMounted(() => {
@@ -89,28 +107,111 @@ onMounted(() => {
     // 调用封装的滚动监听方法
     removeScrollListener = logic.setupScrollListener(terminalContainer, showDownBtn, emits);
 
-    // 监听连接成功事件
-    window.electronAPI.on('telnet-connected', () => {
-        ElMessage.success('Telnet 连接成功！');
-    });
-
-    // 监听连接错误事件
-    window.electronAPI.on('telnet-error', (errorMsg: string) => {
-        ElMessage.error(`Telnet 错误：${errorMsg}`);
-    });
-
-    // 监听 Telnet 数据（显示到终端）
-    window.electronAPI.on('to-vue', (data: any) => {
+    onConnected = () => {
+        ElMessage.success('MUD 连接成功');
+        serverRawBuffer.value = '';
+        emits('ynPrompt', false);
+        emits('mfPrompt', false);
+        emits('helpPrompt', false);
+        emits('emailPrompt', false);
+    };
+    onError = (msg: string) => {
+        ElMessage.error(msg);
+    };
+    onData = (data: { type: string; content: string }) => {
         if (terminal.value) {
             logic.termWrite(terminal, data);
         }
-    });
+        const raw = data?.content ?? '';
+        serverRawBuffer.value = `${serverRawBuffer.value}${raw}`.slice(-4096);
+        quickActions.value = computeQuickActions(raw);
+        emits('ynPrompt', hasYnPrompt(raw));
+        emits('mfPrompt', hasMfPrompt(raw));
+        emits('helpPrompt', hasHelpStartPrompt(raw));
+        if (hasEmailPrompt(serverRawBuffer.value)) {
+            emits('emailPrompt', true);
+        }
+    };
+    onDisconnected = () => {
+        ElMessage.info('MUD 连接已断开');
+        emits('ynPrompt', false);
+        emits('mfPrompt', false);
+        emits('helpPrompt', false);
+        emits('emailPrompt', false);
+    };
 
-    // 监听连接断开事件
-    window.electronAPI.on('telnet-disconnected', () => {
-        ElMessage.info('Telnet 连接已断开');
-    });
+    base.on('telnet-connected', onConnected);
+    base.on('telnet-error', onError);
+    base.on('to-vue', onData);
+    base.on('telnet-disconnected', onDisconnected);
 });
+
+/** 在原始下行文本上检测（保留 ANSI 转义序列） */
+function hasYnPrompt(raw: string): boolean {
+    const ansi = '(?:\\x1b\\[[0-9;]*m)*';
+    const ynWithAnsi = new RegExp(
+        `[(（]${ansi}y${ansi}\\/${ansi}n${ansi}[)）]|${ansi}y${ansi}\\/${ansi}n`,
+        'i'
+    );
+    return ynWithAnsi.test(raw);
+}
+
+function hasMfPrompt(raw: string): boolean {
+    const ansi = '(?:\\x1b\\[[0-9;]*m)*';
+    const mfWithAnsi = new RegExp(
+        `(?:男性|女性)[^\\r\\n]*?\\(${ansi}m${ansi}\\)[^\\r\\n]*?(?:或|/|、|,|，)[^\\r\\n]*?\\(${ansi}f${ansi}\\)|\\(${ansi}m${ansi}\\)[^\\r\\n]*?\\(${ansi}f${ansi}\\)|${ansi}m${ansi}\\/${ansi}f`,
+        'i'
+    );
+    return mfWithAnsi.test(raw);
+}
+
+function hasHelpStartPrompt(raw: string): boolean {
+    return /新手快速晋级教程/i.test(raw) && /\bhelp\s+start2?\b/i.test(raw);
+}
+
+function hasEmailPrompt(raw: string): boolean {
+    // 基于服务端原始下行数据匹配，允许 ANSI 序列夹在中文之间
+    return new RegExp(/\[1;36mregister/i).test(raw);
+}
+
+const computeQuickActions = (content: string): QuickAction[] => {
+    const raw = `${content ?? ''}`;
+    const actions: QuickAction[] = [];
+    const configStore = useConfigStore();
+    const account = configStore.configInfo?.account?.trim();
+    const password = configStore.configInfo?.password?.trim();
+
+    // 菜单区按钮处理：不在终端快捷条重复显示
+    if (hasYnPrompt(raw) || hasMfPrompt(raw) || hasHelpStartPrompt(raw)) {
+        return actions;
+    }
+
+    // 账号/名字相关（中英文都做一层兜底）
+    if (/((你|您)的英文名)|(\bname\b)/i.test(raw)) {
+        if (account) actions.push({ id: 'send-account', label: '发送账号', command: account });
+    }
+    if (/(人物请输入new。)|(\bnew\b)/i.test(raw)) {
+        actions.push({ id: 'send-new', label: '发送 new', command: 'new' });
+    }
+
+    // 密码
+    if (/(请输入密码)|(\bpassword\b)/i.test(raw)) {
+        if (password) actions.push({ id: 'send-password', label: '发送密码', command: password });
+    }
+
+    // 客户端检测确认
+    if (/(即将开始检测你的客户端)|(detect)/i.test(raw)) {
+        actions.push({ id: 'send-y-detect', label: '发送 y', command: 'y' });
+    }
+
+    // 去重（同 id）
+    const seen = new Set<string>();
+    return actions.filter((a) => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return true;
+    });
+};
 
 /**
  * 处理输入框的输入，将非空命令添加到历史记录并发送命令。
@@ -123,11 +224,9 @@ const handleInput = () => {
             // 调用封装方法添加命令到历史记录
             logic.addCommandToHistory(command);
         }
+        base.sendMessage(command);
         // 处理用户输入的命令
         sendCommand(command, terminal);
-        // 发送命令到 Telnet 服务器
-        window.electronAPI.send('telnet-send', command);
-        // window.electronAPI.send('sysCmdEvent', command);
         inputBox.value = '';
     }
 };
@@ -146,7 +245,6 @@ const sendCommand = (command: string, terminal: any, type?: any) => {
         sp = sp[sp.length - 1];
         // 触发事件并传递 command 变量
         emits('sendCommandToChannel', sp);
-        window.electronAPI.send('VueToElectron', sp);
     }
 
     // 显示内容到终端
@@ -242,21 +340,46 @@ const handlefocus = () => {
     inputRef.value?.focus();
 };
 
-// 连接 Telnet 服务器
-const connectTelnet = (host: string, port: number) => {
-    window.electronAPI.send('telnet-connect', { host, port });
+const runQuickAction = (action: QuickAction | string | undefined) => {
+    if (!action) return;
+    if (typeof action !== 'string') {
+        if (action.type === 'focus') {
+            handlefocus();
+            return;
+        }
+        action = action.command;
+    }
+    if (!action?.trim()) return;
+    if (!terminal.value) return;
+    base.sendMessage(action);
+    sendCommand(action, terminal, 'client');
+    // 点击后清空，等待下一次服务端提示刷新
+    quickActions.value = [];
 };
 
-// 断开 Telnet 连接
-const disconnectTelnet = () => {
-    window.electronAPI.send('telnet-disconnect');
+/** 菜单区 y/n 按钮调用：发送并收起菜单按钮 */
+const sendMudQuick = (command: string) => {
+    runQuickAction(command);
+    emits('ynPrompt', false);
+    emits('mfPrompt', false);
+    emits('helpPrompt', false);
 };
+
+const focusEmailInput = () => {
+    inputPlaceholder.value = '输入邮箱（格式：reg xxx@xxx.com）';
+    handlefocus();
+};
+
+defineExpose({ sendMudQuick, focusEmailInput });
 
 // 组件卸载时移除监听器
 onUnmounted(() => {
     removeScrollListener();
-    // 组件卸载时断开 Telnet 连接
-    disconnectTelnet();
+    if (onConnected) base.off('telnet-connected', onConnected);
+    if (onError) base.off('telnet-error', onError);
+    if (onData) base.off('to-vue', onData);
+    if (onDisconnected) base.off('telnet-disconnected', onDisconnected);
+    base.disconnect();
 });
 </script>
 
@@ -282,6 +405,22 @@ onUnmounted(() => {
         position: relative;
         z-index: 3;
         background: #141414;
+    }
+    .quick-actions {
+        display: flex;
+        gap: 6px;
+        padding: 6px 6px;
+        background: #0f0f0f;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        z-index: 3;
+        flex-wrap: wrap;
+    }
+    .account-action-float {
+        position: absolute;
+        right: 1px;
+        bottom: 64px;
+        z-index: 4;
     }
 
     div.xterm {

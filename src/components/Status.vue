@@ -36,50 +36,23 @@
                 <div class="debuff">buff3</div>
             </div>
         </div>
-        <div class="fullme-cd pa">
-            <div class="flex" style="display: none">
-                <el-icon><Clock /></el-icon><span>&nbsp;{{ countdown }}&nbsp;S</span>
-            </div>
+        <div class="send-action pa">
             <div class="fm flex">
-                <el-icon><Pointer /></el-icon><span>Fullme</span>
+                <el-icon><Pointer /></el-icon><span>发送</span>
             </div>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted } from 'vue';
-import { Clock, Pointer } from '@element-plus/icons-vue';
+import { ref } from 'vue';
+import { Pointer } from '@element-plus/icons-vue';
 
-// 初始化倒计时时间，单位：秒
-const countdown = ref(123);
-let timer: any;
 const fighting = ref(false);
-
-// 开始倒计时
-const startCountdown = () => {
-    timer = setInterval(() => {
-        if (countdown.value > 0) {
-            countdown.value--;
-        } else {
-            clearInterval(timer!);
-        }
-    }, 1000);
-};
-
-onMounted(() => {
-    startCountdown();
-});
-
-onUnmounted(() => {
-    if (timer) {
-        clearInterval(timer);
-    }
-});
 </script>
 
 <style lang="scss" scoped>
-.fullme-cd {
+.send-action {
     bottom: -32px;
     right: -62px;
     padding: 5px 5px;
@@ -95,12 +68,14 @@ onUnmounted(() => {
     }
 }
 .status {
-    width: calc(100% - 64px);
+    width: fit-content;
+    max-width: calc(100% - 64px);
     background: #000;
     bottom: 34px;
     left: 0;
     color: #fff;
     font-size: 14px;
+    flex-wrap: wrap;
     .el-progress {
         min-width: 80px;
         margin-right: 8px;

@@ -3,12 +3,32 @@
         <el-container>
             <el-main class="pr">
                 <!-- 使用简化后的方法名 -->
-                <Menu v-if="!hideMenu" :cmd="menuCmd" @checkboxChange="onCheckboxChange" @cancelSelection="onCancel" @confirmSelection="onConfirm" />
+                <Menu
+                    :cmd="menuCmd"
+                    :show-yn-prompt="showYnPrompt"
+                    :show-mf-prompt="showMfPrompt"
+                    :show-help-start-prompt="showHelpStartPrompt"
+                    :show-email-prompt="showEmailPrompt"
+                    @checkboxChange="onCheckboxChange"
+                    @cancelSelection="onCancel"
+                    @confirmSelection="onConfirm"
+                    @ynChoice="onYnChoice"
+                    @mfChoice="onMfChoice"
+                    @helpChoice="onHelpChoice"
+                    @emailChoice="onEmailChoice"
+                />
                 <!-- 修改事件绑定名称 -->
-                <Terminal @showDownward="onShowDownward" @menuCommand="onMenuCmd" @sendCommandToChannel="sendToChannel" />
+                <Terminal
+                    ref="terminalRef"
+                    @showDownward="onShowDownward"
+                    @menuCommand="onMenuCmd"
+                    @sendCommandToChannel="sendToChannel"
+                    @ynPrompt="showYnPrompt = $event"
+                    @mfPrompt="showMfPrompt = $event"
+                    @helpPrompt="showHelpStartPrompt = $event"
+                    @emailPrompt="onEmailPrompt"
+                />
                 <Status />
-                <!-- 监听 hideFullme 事件，控制组件显示隐藏 -->
-                <Fullme v-if="showFullme" @hideFullme="hideFullmeComponent" />
             </el-main>
             <!-- 修改传递的属性名 -->
             <el-aside style="width: 28%">
@@ -25,40 +45,26 @@ import Mudlist from './components/MudList.vue';
 import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
-import Fullme from './components/Fullme.vue';
-import { onMounted, ref, onUnmounted } from 'vue';
-import { Base } from './common/common';
-
-// 声明全局 window 对象的自定义属性
-declare global {
-    interface Window {
-        electronAPI: {
-            send: (channel: string, ...args: any[]) => void;
-            on: (channel: string, listener: (...args: any[]) => void) => void;
-            off: (channel: string, listener: (...args: any[]) => void) => void;
-        };
-    }
-}
+import { ref, onUnmounted } from 'vue';
+import { loadSitesFromStorage, type SiteCard } from './common/common';
 
 const showLayout = ref(false);
-const mudlist = ref<any>([]);
+/** 与 localStorage（vsmud_sites）同步，首屏即可展示已保存站点 */
+const mudlist = ref<SiteCard[]>(loadSitesFromStorage());
 const hideMenu = ref(false);
 const menuCmd = ref('');
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
 // 修改变量名
 const loadScript = ref('');
+const showYnPrompt = ref(false);
+const showMfPrompt = ref(false);
+const showHelpStartPrompt = ref(false);
+const showEmailPrompt = ref(false);
+const terminalRef = ref<{ sendMudQuick?: (cmd: string) => void; focusEmailInput?: () => void } | null>(null);
 
 // 修改 sendToChannel 函数中使用的变量名
 const sendToChannel = (command: string) => {
     loadScript.value = `${command}`;
-};
-
-// 控制 Fullme 组件显示隐藏
-const showFullme = ref(false);
-
-// 隐藏 Fullme 组件的方法
-const hideFullmeComponent = () => {
-    showFullme.value = false;
 };
 
 // =======================
@@ -67,14 +73,12 @@ const hideFullmeComponent = () => {
 const receive = {
     cardClicked: (showTerminal: boolean) => {
         showLayout.value = showTerminal;
-        // const datas = { type: 'telnet', content: Object.assign({ host: 'host', port: 'port' }, data) };
-        // window.electronAPI.send('telnet-connect', datas);
     }
 };
 
 // 显示或隐藏 “向下” 按钮
 const onShowDownward = (shouldHide: boolean) => {
-    hideMenu.value = shouldHide;
+    hideMenu.value = false;
 };
 // 唤起前端界面
 const onMenuCmd = (cmd: string) => {
@@ -95,19 +99,30 @@ const onConfirm = (value: string[]) => {
     selectedCategories.value = value;
 };
 
-onMounted(() => {
-    // new Base().postMessage({ type: 'getAccount', content: '' });
-    window.electronAPI.send('siteList', 1);
-    window.electronAPI.on('site-data', (data: any) => {
-        const { content } = data;
-        for (let i in content) {
-            const cont = JSON.parse(content[i]);
-            mudlist.value.push(cont);
-        }
-    });
-});
+const onYnChoice = (v: 'y' | 'n') => {
+    terminalRef.value?.sendMudQuick?.(v);
+    showYnPrompt.value = false;
+};
 
-// 组件卸载时断开观察器
+const onMfChoice = (v: 'm' | 'f') => {
+    terminalRef.value?.sendMudQuick?.(v);
+    showMfPrompt.value = false;
+};
+
+const onHelpChoice = (cmd: 'help start' | 'help start2') => {
+    terminalRef.value?.sendMudQuick?.(cmd);
+    showHelpStartPrompt.value = false;
+};
+
+const onEmailPrompt = (v: boolean) => {
+    if (v) showEmailPrompt.value = true;
+};
+
+const onEmailChoice = () => {
+    terminalRef.value?.focusEmailInput?.();
+    showEmailPrompt.value = false;
+};
+
 onUnmounted(() => {
     window.removeEventListener('message', () => {});
 });
