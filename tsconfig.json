@@ -6,6 +6,7 @@
         "jsx": "preserve",
         "moduleResolution": "node",
         "skipLibCheck": true,
+        "allowJs": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true,
@@ -18,6 +19,14 @@
         },
         "lib": ["esnext", "dom", "dom.iterable", "scripthost"]
     },
-    "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "tests/**/*.ts", "tests/**/*.tsx"],
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.vue",
+        "tests/**/*.ts",
+        "tests/**/*.tsx",
+        "utils/**/*.js",
+        "utils/**/*.d.ts"
+    ],
     "exclude": ["node_modules"]
 }

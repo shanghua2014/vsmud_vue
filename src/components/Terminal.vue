@@ -1,14 +1,9 @@
 <template>
     <div class="terminal-wrapper">
         <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
-        <div class="account-action-float" v-if="accountAction">
-            <el-button size="small" type="primary" plain @click="runQuickAction(accountAction.command)">
-                {{ accountAction.label }}
-            </el-button>
-        </div>
-        <div class="quick-actions" v-if="otherQuickActions.length">
+        <div class="quick-actions" v-if="quickActions.length">
             <el-button
-                v-for="action in otherQuickActions"
+                v-for="action in quickActions"
                 :key="action.id"
                 size="small"
                 type="primary"
@@ -22,11 +17,37 @@
         <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button" title="置底(alt+z)">
             <Bottom style="width: 31px; height: 1rem" />
         </el-button>
+        <div v-if="showExitDirPanel" class="mud-dir-panel" role="presentation">
+            <div class="dir-panel-capsule" role="group" aria-label="移动方向">
+                <div class="dir-grid-5x5">
+                    <template v-for="(cell, i) in DIR_GRID_5X5" :key="i">
+                        <div v-if="cell === null" class="dir-cell dir-cell--empty" aria-hidden="true" />
+                        <button
+                            v-else-if="cell.kind === 'look'"
+                            type="button"
+                            class="dir-btn dir-btn--look"
+                            @click="sendLook"
+                        >
+                            Look
+                        </button>
+                        <button
+                            v-else-if="cell.kind === 'move' && isExitButtonVisible(cell.cmd)"
+                            type="button"
+                            class="dir-btn"
+                            @click="sendDir(cell.cmd)"
+                        >
+                            {{ cell.label }}
+                        </button>
+                        <div v-else class="dir-cell dir-cell--empty" aria-hidden="true" />
+                    </template>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref, onUnmounted } from 'vue';
+import { onMounted, ref, onUnmounted, computed } from 'vue';
 import { ElInput, ElMessage, ElButton } from 'element-plus';
 import { Bottom } from '@element-plus/icons-vue';
 import { Terminal } from 'xterm';
@@ -34,6 +55,27 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
 import { Base, xTermLoginc } from '@/common/common';
+import { applyMudDownlinkForRoomRecord, resetMudRoomRecord } from '@/common/mudRoomRecord';
+import {
+    applyMudExitDirsFromBuffer,
+    resetMudExitDirs,
+    invalidateMudExitDirs,
+    isUserMoveCommandInput,
+    isExitButtonVisible,
+    mudVisibleExitServerKeys
+} from '@/common/mudExitDirs';
+import {
+    matchAskLaoHereDownlink,
+    matchCloseEyeDownlink,
+    matchLaoCunzhangHuaboMsgDownlink,
+    matchCharacterExistsPasswordDownlink,
+    matchPageMoreUnfinishedDownlink,
+    matchInfoTopicsDownlink,
+    matchKuaiyiPvpPveDownlink,
+    matchReconnectDoneDownlink,
+    matchVeteranPlayerLeaveVillageDownlink,
+    matchWashToFormatDownlink
+} from '@/common/mudDownlinkPrompts';
 import { useConfigStore } from '@/stores/store';
 
 // 创建 xTerm 终端逻辑处理实例
@@ -53,14 +95,90 @@ const inputPlaceholder = ref('命令');
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
 
+const showExitDirPanel = computed(() => {
+    const v = mudVisibleExitServerKeys.value;
+    return v !== null && v.length > 0;
+});
+
+/** 5×5 方向格：四角为空；与图示一致（上行：东北-上方-西北 等） */
+type DirCell = null | { kind: 'look' } | { kind: 'move'; label: string; cmd: string };
+
+const DIR_GRID_5X5: DirCell[] = [
+    null,
+    { kind: 'move', label: '东北', cmd: 'ne' },
+    { kind: 'move', label: '上方', cmd: 'u' },
+    { kind: 'move', label: '西北', cmd: 'nw' },
+    null,
+
+    null,
+    { kind: 'move', label: '北上', cmd: 'nu' },
+    { kind: 'move', label: '北方', cmd: 'n' },
+    { kind: 'move', label: '北下', cmd: 'nd' },
+    null,
+
+    { kind: 'move', label: '进入', cmd: 'enter' },
+    { kind: 'move', label: '西方', cmd: 'w' },
+    { kind: 'look' },
+    { kind: 'move', label: '东方', cmd: 'e' },
+    { kind: 'move', label: '出去', cmd: 'out' },
+
+    null,
+    { kind: 'move', label: '南上', cmd: 'su' },
+    { kind: 'move', label: '南方', cmd: 's' },
+    { kind: 'move', label: '南下', cmd: 'sd' },
+    null,
+
+    null,
+    { kind: 'move', label: '东南', cmd: 'se' },
+    { kind: 'move', label: '下方', cmd: 'd' },
+    { kind: 'move', label: '西南', cmd: 'sw' },
+    null,
+];
+
+const sendDir = (cmd: string) => {
+    invalidateMudExitDirs();
+    base.sendMessage(cmd);
+};
+
+const sendLook = () => {
+    base.sendMessage('look');
+};
+
 // 定义 emit 事件，添加新事件 notifyParent
-const emits = defineEmits(['showDownward', 'menuCommand', 'sendCommandToChannel', 'ynPrompt', 'mfPrompt', 'helpPrompt', 'emailPrompt']);
+const emits = defineEmits([
+    'showDownward',
+    'menuCommand',
+    'sendCommandToChannel',
+    'ynPrompt',
+    'mfPrompt',
+    'emailPrompt',
+    'chooseCharacterPrompt',
+    'askLaoHerePrompt',
+    'washToPrompt',
+    'infoTopicsPrompt',
+    'leaveVillagePrompt',
+    'kuaiyiPvpPvePrompt',
+    'closeEyePrompt',
+    'laoHuaboPrompt',
+    'characterExistsPasswordPrompt',
+    /** 下行 [37m== 未完 时菜单栏显示「下一页」「结束」（同状态） */
+    'pageMorePrompt',
+    'mudSessionStart'
+]);
 
 type QuickAction = { id: string; label: string; command?: string; type?: 'command' | 'focus' };
 const quickActions = ref<QuickAction[]>([]);
-const accountAction = computed(() => quickActions.value.find((a) => a.id === 'send-account') ?? null);
-const otherQuickActions = computed(() => quickActions.value.filter((a) => a.id !== 'send-account'));
+/** 本会话内已自动发过站点卡片账号/密码，避免重复上行 */
+const autoAccountSent = ref(false);
+const autoPasswordSent = ref(false);
 const serverRawBuffer = ref('');
+/**
+ * 点「结束」或输入 q 后置位：立即隐藏。清零条件（恢复匹配）：缓冲尾部不再含「未完」，或本包下行里出现新的分页提示行；
+ * 不能用「任意非空 raw」清零，否则首包下行就会把标志清掉，按钮立刻被匹配再次打开。
+ */
+const pageMoreHidden = ref(false);
+/** 本会话内已对「重新连线完毕」自动发过 look，避免缓冲区内重复命中 */
+const reconnectLookSent = ref(false);
 
 let removeScrollListener: () => void;
 let onConnected: (() => void) | null = null;
@@ -109,11 +227,27 @@ onMounted(() => {
 
     onConnected = () => {
         ElMessage.success('MUD 连接成功');
+        resetMudRoomRecord();
+        resetMudExitDirs();
         serverRawBuffer.value = '';
+        pageMoreHidden.value = false;
         emits('ynPrompt', false);
         emits('mfPrompt', false);
-        emits('helpPrompt', false);
         emits('emailPrompt', false);
+        emits('chooseCharacterPrompt', false);
+        emits('askLaoHerePrompt', false);
+        emits('washToPrompt', false);
+        emits('infoTopicsPrompt', false);
+        emits('leaveVillagePrompt', false);
+        emits('kuaiyiPvpPvePrompt', false);
+        emits('closeEyePrompt', false);
+        emits('laoHuaboPrompt', false);
+        emits('characterExistsPasswordPrompt', false);
+        emits('pageMorePrompt', false);
+        autoAccountSent.value = false;
+        autoPasswordSent.value = false;
+        reconnectLookSent.value = false;
+        emits('mudSessionStart');
     };
     onError = (msg: string) => {
         ElMessage.error(msg);
@@ -123,21 +257,110 @@ onMounted(() => {
             logic.termWrite(terminal, data);
         }
         const raw = data?.content ?? '';
+        applyMudDownlinkForRoomRecord(raw);
         serverRawBuffer.value = `${serverRawBuffer.value}${raw}`.slice(-4096);
+        applyMudExitDirsFromBuffer(serverRawBuffer.value);
+
+        if (!reconnectLookSent.value && matchReconnectDoneDownlink(serverRawBuffer.value)) {
+            reconnectLookSent.value = true;
+            base.sendMessage('look');
+            if (terminal.value) {
+                sendCommand('look', terminal, 'client');
+            }
+        }
+
+        const configStoreAuto = useConfigStore();
+        const accountTrim = configStoreAuto.configInfo?.account?.trim();
+        const pwdTrim = configStoreAuto.configInfo?.password?.trim();
+        const skipCredAuto = hasYnPrompt(raw) || hasMfPrompt(raw);
+        if (!skipCredAuto && terminal.value) {
+            if (pwdTrim && !autoPasswordSent.value) {
+                const pwdMatch =
+                    /(请输入密码)|(\bpassword\b)/i.test(raw) ||
+                    matchCharacterExistsPasswordDownlink(serverRawBuffer.value);
+                if (pwdMatch) {
+                    autoPasswordSent.value = true;
+                    base.sendMessage(pwdTrim);
+                    sendCommand(pwdTrim, terminal, 'client');
+                }
+            }
+            if (accountTrim && !autoAccountSent.value) {
+                if (/((你|您)的英文名)|(\bname\b)/i.test(raw)) {
+                    autoAccountSent.value = true;
+                    base.sendMessage(accountTrim);
+                    sendCommand(accountTrim, terminal, 'client');
+                }
+            }
+        }
+
         quickActions.value = computeQuickActions(raw);
+        // 每条下行用当前缓冲尾部最后几行重匹配；匹配不到则隐藏
+        const buf = serverRawBuffer.value;
+        const pageMoreMatched = matchPageMoreUnfinishedDownlink(buf);
+        const pageMorePromptInThisChunk =
+            raw.length > 0 && matchPageMoreUnfinishedDownlink(raw);
+        if (pageMoreHidden.value) {
+            if (!pageMoreMatched || pageMorePromptInThisChunk) {
+                pageMoreHidden.value = false;
+            }
+        }
+        if (pageMoreHidden.value) {
+            emits('pageMorePrompt', false);
+        } else {
+            emits('pageMorePrompt', pageMoreMatched);
+        }
         emits('ynPrompt', hasYnPrompt(raw));
         emits('mfPrompt', hasMfPrompt(raw));
-        emits('helpPrompt', hasHelpStartPrompt(raw));
         if (hasEmailPrompt(serverRawBuffer.value)) {
             emits('emailPrompt', true);
+        }
+        if (hasChooseCharacterPrompt(serverRawBuffer.value)) {
+            inputPlaceholder.value = '命令';
+            emits('chooseCharacterPrompt', true);
+        }
+        if (matchAskLaoHereDownlink(serverRawBuffer.value)) {
+            emits('askLaoHerePrompt', true);
+        }
+        if (matchWashToFormatDownlink(serverRawBuffer.value)) {
+            emits('washToPrompt', true);
+        }
+        if (matchInfoTopicsDownlink(serverRawBuffer.value)) {
+            emits('infoTopicsPrompt', true);
+        }
+        if (matchVeteranPlayerLeaveVillageDownlink(serverRawBuffer.value)) {
+            emits('leaveVillagePrompt', true);
+        }
+        if (matchKuaiyiPvpPveDownlink(serverRawBuffer.value)) {
+            emits('kuaiyiPvpPvePrompt', true);
+        }
+        if (matchCloseEyeDownlink(serverRawBuffer.value)) {
+            emits('closeEyePrompt', true);
+        }
+        if (matchLaoCunzhangHuaboMsgDownlink(serverRawBuffer.value)) {
+            emits('laoHuaboPrompt', true);
+        }
+        if (matchCharacterExistsPasswordDownlink(serverRawBuffer.value)) {
+            emits('characterExistsPasswordPrompt', true);
         }
     };
     onDisconnected = () => {
         ElMessage.info('MUD 连接已断开');
+        resetMudRoomRecord();
+        resetMudExitDirs();
+        pageMoreHidden.value = false;
         emits('ynPrompt', false);
         emits('mfPrompt', false);
-        emits('helpPrompt', false);
         emits('emailPrompt', false);
+        emits('chooseCharacterPrompt', false);
+        emits('askLaoHerePrompt', false);
+        emits('washToPrompt', false);
+        emits('infoTopicsPrompt', false);
+        emits('leaveVillagePrompt', false);
+        emits('kuaiyiPvpPvePrompt', false);
+        emits('closeEyePrompt', false);
+        emits('laoHuaboPrompt', false);
+        emits('characterExistsPasswordPrompt', false);
+        emits('pageMorePrompt', false);
     };
 
     base.on('telnet-connected', onConnected);
@@ -165,38 +388,27 @@ function hasMfPrompt(raw: string): boolean {
     return mfWithAnsi.test(raw);
 }
 
-function hasHelpStartPrompt(raw: string): boolean {
-    return /新手快速晋级教程/i.test(raw) && /\bhelp\s+start2?\b/i.test(raw);
-}
-
 function hasEmailPrompt(raw: string): boolean {
     // 基于服务端原始下行数据匹配，允许 ANSI 序列夹在中文之间
     return new RegExp(/\[1;36mregister/i).test(raw);
 }
 
-const computeQuickActions = (content: string): QuickAction[] => {
-    const raw = `${content ?? ''}`;
+/** 原始下行中含 [2;37;0m您可以选择(choose，兼容前有 ESC */
+function hasChooseCharacterPrompt(raw: string): boolean {
+    return /(?:\x1b)?\[2;37;0m您可以选择\(choose/i.test(raw);
+}
+
+const computeQuickActions = (latestChunk: string): QuickAction[] => {
+    const raw = `${latestChunk ?? ''}`;
     const actions: QuickAction[] = [];
-    const configStore = useConfigStore();
-    const account = configStore.configInfo?.account?.trim();
-    const password = configStore.configInfo?.password?.trim();
 
     // 菜单区按钮处理：不在终端快捷条重复显示
-    if (hasYnPrompt(raw) || hasMfPrompt(raw) || hasHelpStartPrompt(raw)) {
+    if (hasYnPrompt(raw) || hasMfPrompt(raw)) {
         return actions;
     }
 
-    // 账号/名字相关（中英文都做一层兜底）
-    if (/((你|您)的英文名)|(\bname\b)/i.test(raw)) {
-        if (account) actions.push({ id: 'send-account', label: '发送账号', command: account });
-    }
     if (/(人物请输入new。)|(\bnew\b)/i.test(raw)) {
         actions.push({ id: 'send-new', label: '发送 new', command: 'new' });
-    }
-
-    // 密码
-    if (/(请输入密码)|(\bpassword\b)/i.test(raw)) {
-        if (password) actions.push({ id: 'send-password', label: '发送密码', command: password });
     }
 
     // 客户端检测确认
@@ -213,21 +425,73 @@ const computeQuickActions = (content: string): QuickAction[] => {
     });
 };
 
+/** 按英文分号拆成多条命令，trim 并去掉空段（如 "e;e;e" → ["e","e","e"]） */
+function splitSemicolonCommands(input: string): string[] {
+    return input
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+}
+
+/** 分号串联：每批最多条数；批次之间额外间隔（毫秒） */
+const SEMICOLON_BATCH_MAX = 5;
+const SEMICOLON_BATCH_GAP_MS = 1000;
+/** 同一批内相邻两条命令间隔（毫秒） */
+const SEMICOLON_COMMAND_GAP_MS = 500;
+
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+        out.push(items.slice(i, i + chunkSize));
+    }
+    return out;
+}
+
+function delayMs(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * 处理输入框的输入，将非空命令添加到历史记录并发送命令。
+ * 支持用 ";" 连接多条命令：每批最多 {@link SEMICOLON_BATCH_MAX} 条；
+ * 批内相邻两条间隔 {@link SEMICOLON_COMMAND_GAP_MS}ms；下一批开始前再间隔 {@link SEMICOLON_BATCH_GAP_MS}ms。
  */
-const handleInput = () => {
-    if (terminal.value) {
-        const command = inputBox.value;
-        // 判断命令是否不为空，不为空则添加到历史记录
-        if (command.trim() !== '') {
-            // 调用封装方法添加命令到历史记录
-            logic.addCommandToHistory(command);
-        }
-        base.sendMessage(command);
-        // 处理用户输入的命令
-        sendCommand(command, terminal);
+const handleInput = async () => {
+    if (!terminal.value) return;
+    const raw = inputBox.value;
+    // 空或仅空白：发送纯回车（与 Base.sendMessage('') 一致，上行 \\r\\n）
+    if (raw.trim() === '') {
+        logic.addCommandToHistory('');
         inputBox.value = '';
+        emits('pageMorePrompt', false);
+        base.sendMessage('');
+        sendCommand('', terminal);
+        return;
+    }
+
+    const parts = splitSemicolonCommands(raw);
+    if (parts.length === 0) return;
+
+    if (parts.some((p) => isUserMoveCommandInput(p))) {
+        invalidateMudExitDirs();
+    }
+
+    if (parts.some((p) => p.trim().toLowerCase() === 'q')) {
+        pageMoreHidden.value = true;
+    }
+    emits('pageMorePrompt', false);
+    logic.addCommandToHistory(raw);
+    inputBox.value = '';
+
+    const batches = chunkArray(parts, SEMICOLON_BATCH_MAX);
+    for (let b = 0; b < batches.length; b++) {
+        if (b > 0) await delayMs(SEMICOLON_BATCH_GAP_MS);
+        const batch = batches[b];
+        for (let i = 0; i < batch.length; i++) {
+            if (i > 0) await delayMs(SEMICOLON_COMMAND_GAP_MS);
+            base.sendMessage(batch[i]);
+            sendCommand(batch[i], terminal);
+        }
     }
 };
 
@@ -237,34 +501,35 @@ const handleInput = () => {
  * @param terminal - 终端实例
  */
 const sendCommand = (command: string, terminal: any, type?: any) => {
-    // 加载脚本文件
-    let cmd = `${base.colors.green}[ ${command} ]${base.colors.reset}\r\n`;
     if (type === 'client') {
-        cmd = `${base.colors.blue}${command}${base.colors.reset}\r\n`;
         let sp: Array<string> | string = command.split('\\');
         sp = sp[sp.length - 1];
-        // 触发事件并传递 command 变量
         emits('sendCommandToChannel', sp);
     }
 
-    // 显示内容到终端
-    terminal.value.write(`${cmd}\r\n`, () => {
-        // 全选输入框中的内容
+    const afterWrite = () => {
         if (inputRef.value) {
             const inputElement = inputRef.value.$el.querySelector('input') as HTMLInputElement;
             if (inputElement) {
                 inputElement.select();
             }
         }
-
-        // 确保光标在最底部
         scrollToBottom();
+    };
 
-        // if (command === 'telnet') {
-        //     console.log('连接mud.pkuxkx.net');
-        //     connectTelnet('mud.pkuxkx.net', 8081);
-        // }
-    });
+    /** 纯回车上行不在前端回显（避免刷屏 [↵]） */
+    if (command === '') {
+        afterWrite();
+        return;
+    }
+
+    const displayCmd = command;
+    let cmd = `${base.colors.green}[ ${displayCmd} ]${base.colors.reset}\r\n`;
+    if (type === 'client') {
+        cmd = `${base.colors.blue}${displayCmd}${base.colors.reset}\r\n`;
+    }
+
+    terminal.value.write(`${cmd}\r\n`, afterWrite);
 
     // 定义可替换的关键字数组，使用 as const 声明为只读元组
     const keywords = ['show', 'set'] as const;
@@ -362,7 +627,32 @@ const sendMudQuick = (command: string) => {
     runQuickAction(command);
     emits('ynPrompt', false);
     emits('mfPrompt', false);
-    emits('helpPrompt', false);
+    emits('chooseCharacterPrompt', false);
+    emits('askLaoHerePrompt', false);
+    emits('washToPrompt', false);
+    emits('infoTopicsPrompt', false);
+    emits('leaveVillagePrompt', false);
+    emits('kuaiyiPvpPvePrompt', false);
+    emits('closeEyePrompt', false);
+    emits('laoHuaboPrompt', false);
+    emits('characterExistsPasswordPrompt', false);
+    emits('pageMorePrompt', false);
+};
+
+const sendNextPageEnter = () => {
+    if (!terminal.value) return;
+    emits('pageMorePrompt', false);
+    base.sendMessage('');
+    sendCommand('', terminal, 'client');
+};
+
+/** 菜单「结束」：发 q 并收起「下一页」「结束」 */
+const sendPageEndQuit = () => {
+    if (!terminal.value) return;
+    pageMoreHidden.value = true;
+    emits('pageMorePrompt', false);
+    base.sendMessage('q');
+    sendCommand('q', terminal, 'client');
 };
 
 const focusEmailInput = () => {
@@ -370,7 +660,64 @@ const focusEmailInput = () => {
     handlefocus();
 };
 
-defineExpose({ sendMudQuick, focusEmailInput });
+const sendCharacterChoice = (command: string) => {
+    runQuickAction(command);
+    inputBox.value = '';
+    emits('chooseCharacterPrompt', false);
+};
+
+const sendAskLaoHereChoice = (command: string) => {
+    runQuickAction(command);
+    emits('askLaoHerePrompt', false);
+};
+
+const sendWashToChoice = (command: string) => {
+    runQuickAction(command);
+    emits('washToPrompt', false);
+};
+
+/** 仅发命令，不收起菜单区「信息」提示（可连续点多个数字）；同步写入底部命令栏 */
+const sendInfoTopicChoice = (command: string) => {
+    runQuickAction(command);
+    inputBox.value = command;
+    handlefocus();
+};
+
+const sendLeaveVillageChoice = (command: string) => {
+    runQuickAction(command);
+    emits('leaveVillagePrompt', false);
+};
+
+const sendKuaiyiPvpPveChoice = (command: string) => {
+    runQuickAction(command);
+    inputBox.value = '';
+    emits('kuaiyiPvpPvePrompt', false);
+};
+
+const sendCloseEyeChoice = (command: string) => {
+    runQuickAction(command);
+    emits('closeEyePrompt', false);
+};
+
+const sendLaoHuaboChoice = (command: string) => {
+    runQuickAction(command);
+    emits('laoHuaboPrompt', false);
+};
+
+defineExpose({
+    sendMudQuick,
+    focusEmailInput,
+    sendCharacterChoice,
+    sendAskLaoHereChoice,
+    sendWashToChoice,
+    sendInfoTopicChoice,
+    sendLeaveVillageChoice,
+    sendKuaiyiPvpPveChoice,
+    sendCloseEyeChoice,
+    sendLaoHuaboChoice,
+    sendNextPageEnter,
+    sendPageEndQuit
+});
 
 // 组件卸载时移除监听器
 onUnmounted(() => {
@@ -416,12 +763,6 @@ onUnmounted(() => {
         z-index: 3;
         flex-wrap: wrap;
     }
-    .account-action-float {
-        position: absolute;
-        right: 1px;
-        bottom: 64px;
-        z-index: 4;
-    }
 
     div.xterm {
         div.xterm-rows {
@@ -452,6 +793,80 @@ onUnmounted(() => {
         padding: 8px 14px;
         background: #1f1f1f;
         border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+    }
+
+    /* 方向区：叠在终端右侧，距容器底约 1/3 高度 */
+    .mud-dir-panel {
+        position: absolute;
+        right: 3px;
+        bottom: 33.333%;
+        z-index: 10;
+        width: min(300px, 58vw);
+        pointer-events: auto;
+    }
+
+    /*
+     * 竖向「胶囊」轮廓：大圆角 + 轻微渐变，避免多边形裁切带来的生硬感
+     */
+    .dir-panel-capsule {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 3px 5px 5px;
+        border-radius: 10px;
+        background: linear-gradient(165deg, rgba(42, 48, 58, 0.94) 0%, rgba(22, 24, 32, 0.97) 55%, rgba(16, 18, 26, 0.98) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow:
+            0 8px 28px rgba(0, 0, 0, 0.55),
+            0 0 0 1px rgba(0, 0, 0, 0.35) inset,
+            0 1px 0 rgba(255, 255, 255, 0.09) inset;
+        backdrop-filter: blur(12px);
+    }
+
+    .dir-grid-5x5 {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-rows: repeat(5, auto);
+        gap: 4px;
+        width: 100%;
+    }
+
+    .dir-cell--empty {
+        min-height: 26px;
+    }
+
+    .dir-btn--look {
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .dir-btn {
+        height: 26px;
+        min-width: 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.75);
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-family: inherit;
+        white-space: nowrap;
+
+        &:hover {
+            background: rgba(64, 158, 255, 0.2);
+            border-color: rgba(64, 158, 255, 0.45);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(64, 158, 255, 0.2);
+        }
+
+        &:active {
+            background: rgba(64, 158, 255, 0.35);
+            border-color: rgba(64, 158, 255, 0.7);
+        }
     }
 }
 </style>

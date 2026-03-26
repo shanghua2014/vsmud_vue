@@ -54,7 +54,7 @@ const fighting = ref(false);
 <style lang="scss" scoped>
 .send-action {
     bottom: -32px;
-    right: -62px;
+    right: -64px;
     padding: 5px 5px;
     background-color: #fff;
     color: #000;
@@ -68,8 +68,7 @@ const fighting = ref(false);
     }
 }
 .status {
-    width: fit-content;
-    max-width: calc(100% - 64px);
+    width: calc(100% - 64px);
     background: #000;
     bottom: 34px;
     left: 0;

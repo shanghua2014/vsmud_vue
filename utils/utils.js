@@ -65,5 +65,26 @@ export const Utils = {
             }
         }
         return value;
+    },
+
+    /**
+     * 剥离 MUD 下行中的 ANSI/ASCII 控制序列，用于按钮、列表等纯文本展示。
+     * 支持标准 CSI（ESC [ … m）以及常见“丢了 ESC”的 [2;37;0m 形式；可选去掉前缀 “.”。
+     * @param {string} raw
+     * @param {{ stripLeadingDot?: boolean }} [options] stripLeadingDot 默认 true，去掉开头的 “.”
+     * @returns {string}
+     * @example Utils.parseMudLabelForDisplay('\\x1b[2;37;0m.光明磊落') // '光明磊落'
+     */
+    parseMudLabelForDisplay(raw, options = {}) {
+        const stripLeadingDot = options.stripLeadingDot !== false;
+        let s = raw == null ? '' : String(raw);
+        // SGR：参数仅为数字、分号；部分终端 truecolor 使用冒号子参数（如 38:2:r:g:b）
+        s = s.replace(/\x1b\[[0-9;:]*m/g, '');
+        s = s.replace(/\[(?:\d+;)*\d+m/g, '');
+        s = s.trim();
+        if (stripLeadingDot && s.startsWith('.')) {
+            s = s.slice(1).trim();
+        }
+        return s;
     }
 };
