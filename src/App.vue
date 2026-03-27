@@ -29,6 +29,7 @@
                     @psBoth="pwdSuperBothPhasesSeenSrv = $event"
                     @pn2="pwdNormalSecondSeenSrv = $event"
                     @mudSess="onMudSess"
+                    @quitListComplete="onQuitListComplete"
                 />
                 <Menu
                     v-model:dir-panel-on="dirPanelOn"
@@ -67,6 +68,7 @@
                     :show-close-eye="showCloseEye"
                     @closeEyeChoice="onCloseEyeChoice"
                     :show-ask-lao-huabo="showAskLaoHuabo"
+                    :lao-huabo-cooldown-sec="laoHuaboCooldownSec"
                     @laoHuaboChoice="onLaoHuaboChoice"
                     :show-page-more="showPageMore"
                     @pageMoreChoice="onPageMoreChoice"
@@ -76,6 +78,8 @@
                     @quanMingChoice="onQuanMingChoice"
                     @pwdSuperChoice="onPwdSuperChoice"
                     @pwdNormalChoice="onPwdNormalChoice"
+                    @clearTerminal="onClearTerminal"
+                    @reconnectMud="onReconnectMud"
                 />
                 <Status />
             </el-main>
@@ -94,7 +98,7 @@ import Mudlist from './components/MudList.vue';
 import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
     loadSites,
@@ -105,7 +109,8 @@ import {
     nameToFullNameBtns,
     pwdSuperBtns,
     pwdNormBtns,
-    type SiteCard
+    type SiteCard,
+    Base
 } from './common/common';
 import { storeToRefs } from 'pinia';
 import { useConfigStore } from './stores/store';
@@ -166,6 +171,9 @@ const huaboSrv = ref(false);
 /** 终端下行 [37m== 未完：菜单栏「下一页」「结束」 */
 const pageMoreSrv = ref(false);
 const s1 = createS1();
+
+/** 重连用（与 Terminal/MudList 同一模块级 WebSocket） */
+const mudBase = new Base();
 
 /** 姓名三步：桥接互斥（全名 > 名字 > 姓氏）且各步点选一次后本会话不再显示 */
 const quanMingVisible = computed(() =>
@@ -329,7 +337,47 @@ const terminalRef = ref<{
     sendHbChoice?: (cmd: string) => void;
     sendPgEnter?: () => void;
     sendPgEnd?: () => void;
+    mudDisconnect?: () => void;
+    clearTerminal?: () => void;
+    printLocalLine?: (text: string) => void;
+    startQuitAndReturnList?: () => void;
 } | null>(null);
+
+/** 「找花伯」按钮出现后 10 秒内点击不发命令，仅终端提示；按钮上显示剩余秒数 */
+const LAOHUABO_COOLDOWN_MS = 10_000;
+const laoHuaboCooldownUntil = ref(0);
+const laoHuaboCooldownSec = ref(0);
+let laoHuaboTick: ReturnType<typeof setInterval> | null = null;
+
+function clearLaoHuaboTick() {
+    if (laoHuaboTick) {
+        clearInterval(laoHuaboTick);
+        laoHuaboTick = null;
+    }
+}
+
+function updateLaoHuaboSec() {
+    const u = laoHuaboCooldownUntil.value;
+    if (!u) {
+        laoHuaboCooldownSec.value = 0;
+        return;
+    }
+    const left = Math.max(0, Math.ceil((u - Date.now()) / 1000));
+    laoHuaboCooldownSec.value = left;
+    if (left === 0) clearLaoHuaboTick();
+}
+
+watch(showAskLaoHuabo, (show) => {
+    clearLaoHuaboTick();
+    if (show) {
+        laoHuaboCooldownUntil.value = Date.now() + LAOHUABO_COOLDOWN_MS;
+        updateLaoHuaboSec();
+        laoHuaboTick = setInterval(updateLaoHuaboSec, 250);
+    } else {
+        laoHuaboCooldownUntil.value = 0;
+        laoHuaboCooldownSec.value = 0;
+    }
+});
 
 // 修改 sendToChannel 函数中使用的变量名
 const sendToChannel = (command: string) => {
@@ -343,6 +391,46 @@ const receive = {
     cardClicked: (showTerminal: boolean) => {
         showLayout.value = showTerminal;
     }
+};
+
+/** 文档菜单「退出」：先发 quit，下行匹配放弃账号则静默发 y，再清屏；超时也会清屏 */
+const onClearTerminal = () => {
+    terminalRef.value?.startQuitAndReturnList?.();
+};
+
+const onQuitListComplete = () => {
+    showLayout.value = false;
+};
+
+/** 站点卡片 Email 校验（与 MudList 一致） */
+function validateEmailForReconnect(email: string): string | null {
+    const t = email.trim();
+    if (!t) return '请填写 Email';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) {
+        return 'Email 格式不正确';
+    }
+    return null;
+}
+
+/** 文档菜单「重连」：校验 Email 后断开并重新连接当前站点 */
+const onReconnectMud = () => {
+    const err = validateEmailForReconnect(cfg.value?.email ?? '');
+    if (err) {
+        ElMessage.warning(err);
+        return;
+    }
+    const c = cfg.value;
+    if (!c?.ip?.trim() || !c?.port?.trim()) {
+        ElMessage.warning('站点配置不完整');
+        return;
+    }
+    terminalRef.value?.mudDisconnect?.();
+    void nextTick(() => {
+        mudBase.connect({
+            type: 'telnet',
+            content: c as SiteCard
+        });
+    });
 };
 
 // 显示或隐藏 “向下” 按钮
@@ -528,11 +616,16 @@ const onCloseEyeChoice = () => {
 };
 
 const onLaoHuaboChoice = () => {
+    if (Date.now() < laoHuaboCooldownUntil.value) {
+        terminalRef.value?.printLocalLine?.('稍等系统喘息中。。。');
+        return;
+    }
     terminalRef.value?.sendHbChoice?.(HB_CMD);
     s1.suppress(S1.LHb);
 };
 
 onUnmounted(() => {
+    clearLaoHuaboTick();
     window.removeEventListener('message', () => {});
 });
 </script>

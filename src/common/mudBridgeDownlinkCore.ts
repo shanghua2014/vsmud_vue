@@ -49,6 +49,9 @@ export const HB_PAT = /(?:\x1b)?\[1;36m老村长嘱咐道：/;
 /** 菜单「找花伯」点击后发往服务器的命令 */
 export const HB_CMD = 'walk 村口';
 
+/** quit 后确认放弃账号提示；兼容 CSI 前有 ESC */
+export const QUIT_ABANDON_PAT = /(?:\x1b)?\[1;37m您选择了放弃该账号/;
+
 const CX_BUF0 = '^(?:\\x1b\\[[0-9;]*m)*这个角色已经存在[，,]';
 const CX_NL = '(?:\\r\\n|\\r|\\n)(?:\\x1b\\[[0-9;]*m)*这个角色已经存在[，,]';
 

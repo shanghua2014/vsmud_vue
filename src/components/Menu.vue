@@ -104,7 +104,9 @@
         >
             闭眼
         </el-button>
-        <el-button v-if="showAskLaoHuabo" size="small" type="primary" plain @click="pickLaoHuabo">找花伯</el-button>
+        <el-button v-if="showAskLaoHuabo" size="small" type="primary" plain @click="pickLaoHuabo">
+            {{ laoHuaboCooldownSec > 0 ? `找花伯 ${laoHuaboCooldownSec}s` : '找花伯' }}
+        </el-button>
         <div v-if="showInfoTopics && !showChooseCharacter" class="mud-info-topics-block">
             <div v-if="infoTopicsExpanded" class="mud-info-topic-float">
                 <div class="mud-info-topic-grid">
@@ -167,33 +169,23 @@
             </el-button>
         </template>
     </div>
-    <el-menu
-        :default-active="activeIndex"
-        class="el-menu-demo pa"
-        mode="horizontal"
-        :ellipsis="false"
-        @select="handleSelect"
-        :collapse="true"
-        menu-trigger="hover"
-    >
-        <el-sub-menu index="0">
-            <template #title>
-                <el-icon><Document /></el-icon>
-            </template>
-            <el-sub-menu index="3-1">
-                <template #title>账号</template>
-                <el-menu-item index="#reconnect">重连(#rec)</el-menu-item>
-            </el-sub-menu>
-            <el-sub-menu index="2-1">
-                <template #title>界面</template>
-                <el-menu-item index="#setting" @click="openSet">设置(#set)</el-menu-item>
-            </el-sub-menu>
-            <el-sub-menu index="1-1">
-                <template #title>脚本</template>
-                <el-menu-item index="#reload">重载(#re)</el-menu-item>
-            </el-sub-menu>
-        </el-sub-menu>
-    </el-menu>
+    <div ref="docMenuRootRef" class="mud-doc-menu pa">
+        <button
+            type="button"
+            class="mud-doc-menu__trigger"
+            :aria-expanded="docMenuOpen"
+            aria-haspopup="true"
+            aria-label="文档菜单"
+            @click="docMenuOpen = !docMenuOpen"
+        >
+            <el-icon><Document /></el-icon>
+        </button>
+        <div v-show="docMenuOpen" class="mud-doc-menu__panel" role="menu">
+            <button type="button" class="mud-doc-menu__item" role="menuitem" @click="onMenuReconnect">重连</button>
+            <button type="button" class="mud-doc-menu__item" role="menuitem" @click="onMenuSettings">设置</button>
+            <button type="button" class="mud-doc-menu__item" role="menuitem" @click="onMenuExit">退出</button>
+        </div>
+    </div>
     <el-drawer v-model="openSetting" :direction="setDirection" :with-header="false" class="pr">
         <template #default>
             <el-row :gutter="20" class="drawer-row-dir">
@@ -245,9 +237,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { Document } from '@element-plus/icons-vue'; // 导入图标组件
-import { Base } from '../common/common';
 import { INF_N, KY_PVE_CMD, KY_PVP_CMD } from '../common/mudDownlinkPrompts';
 import { Utils } from '../../utils/utils';
 import type { DrawerProps } from 'element-plus';
@@ -277,6 +268,8 @@ const props = withDefaults(
     showCloseEye?: boolean;
     /** 下行匹配 [1;36m老村长嘱咐道： 时显示「找花伯」（父组件聚合互斥） */
     showAskLaoHuabo?: boolean;
+    /** 「找花伯」冷却剩余秒数（>0 时显示在按钮上） */
+    laoHuaboCooldownSec?: number;
     /** 下行 [37m== 未完 时显示「下一页」「结束」 */
     showPageMore?: boolean;
     /** 桥接 [1;32m姓氏：与 surnameButtons 同时满足时显示 */
@@ -309,7 +302,8 @@ const props = withDefaults(
         showPwdSuperPrompt: false,
         pwdSuperButtons: () => [],
         showPwdNormalPrompt: false,
-        pwdNormalButtons: () => []
+        pwdNormalButtons: () => [],
+        laoHuaboCooldownSec: 0
     }
 );
 
@@ -366,7 +360,11 @@ const emits = defineEmits([
     'mingZiChoice',
     'quanMingChoice',
     'pwdSuperChoice',
-    'pwdNormalChoice'
+    'pwdNormalChoice',
+    /** 文档菜单「退出」：父组件触发 quit 流程 */
+    'clearTerminal',
+    /** 文档菜单「重连」 */
+    'reconnectMud'
 ]);
 
 const infoTopicNumbers = Array.from({ length: INF_N }, (_, i) => i + 1);
@@ -380,8 +378,35 @@ const characterChoices = [
     { label: '[2;37;0m阴险奸诈', command: 'choose 4' }
 ] as const;
 
-const base = new Base();
-const activeIndex = ref('1');
+/** 文档图标下拉是否展开 */
+const docMenuOpen = ref(false);
+const docMenuRootRef = ref<HTMLElement | null>(null);
+
+let docMenuOutsideOff: (() => void) | null = null;
+function bindDocMenuOutsideClose() {
+    docMenuOutsideOff?.();
+    docMenuOutsideOff = null;
+    if (!docMenuOpen.value) return;
+    const onPointerDown = (e: PointerEvent) => {
+        const root = docMenuRootRef.value;
+        if (root?.contains(e.target as Node)) return;
+        docMenuOpen.value = false;
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    docMenuOutsideOff = () => document.removeEventListener('pointerdown', onPointerDown, true);
+}
+
+watch(docMenuOpen, (open) => {
+    docMenuOutsideOff?.();
+    docMenuOutsideOff = null;
+    if (open) {
+        queueMicrotask(() => bindDocMenuOutsideClose());
+    }
+});
+
+onUnmounted(() => {
+    docMenuOutsideOff?.();
+});
 
 const form = ref({
     // 初始化时添加 'chat' 让闲聊选项默认选中
@@ -517,16 +542,27 @@ const pickLaoHuabo = () => {
     emits('laoHuaboChoice');
 };
 
+function onMenuReconnect() {
+    emits('reconnectMud');
+    docMenuOpen.value = false;
+}
+
+function onMenuSettings() {
+    openSet();
+    docMenuOpen.value = false;
+}
+
+function onMenuExit() {
+    emits('clearTerminal');
+    docMenuOpen.value = false;
+}
+
 watch(
     () => props.showInfoTopics,
     (v) => {
         if (!v) infoTopicsExpanded.value = false;
     }
 );
-
-const handleSelect = (key: string, keyPath: string[]) => {
-    base.sendMessage(keyPath[2] ?? key);
-};
 
 // 监听 props.cmd 的变化，将其赋值给新变量
 watch(
@@ -587,16 +623,49 @@ watch(
     right: 0;
     padding: 10px !important;
 }
-ul.el-menu-demo {
-    height: 30px;
-    width: 60px;
+.mud-doc-menu {
     bottom: 31px;
     right: 1px;
+    z-index: 50;
+}
+.mud-doc-menu__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--el-menu-border-color);
+    border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+    background: #1f1f1f;
+    color: var(--el-menu-text-color);
+    cursor: pointer;
+}
+.mud-doc-menu__panel {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 4px;
+    min-width: 100px;
+    padding: 4px 0;
     background: #1f1f1f;
     border: 1px solid var(--el-menu-border-color);
-    justify-content: center;
-    z-index: 50;
-    border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+    border-radius: var(--el-border-radius-base);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
+}
+.mud-doc-menu__item {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.mud-doc-menu__item:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 .mud-yn-actions {
     display: flex;
@@ -652,37 +721,6 @@ ul.el-menu-demo {
 .mud-info-toggle-btn {
     position: relative;
     z-index: 3;
-}
-ul.el-menu--popup {
-    padding: 0;
-    min-width: auto;
-}
-.el-menu--horizontal .el-menu .el-menu-item,
-.el-menu--horizontal .el-menu .el-sub-menu__title {
-    justify-content: space-around;
-}
-div.el-menu--horizontal .el-menu .el-sub-menu__title {
-    padding: 0;
-    width: 90px;
-}
-// 从左侧偏移
-div.el-popper.is-pure:first-child {
-    transform: translateX(-31px) !important;
-}
-.el-sub-menu .el-popper.is-pure.el-tooltip {
-    transform: translateX(-192px) !important;
-    min-width: 90px;
-}
-.el-menu--horizontal > .el-menu-item:nth-child(1) {
-    margin-right: auto;
-}
-.el-menu--horizontal > .el-sub-menu.is-active .el-sub-menu__title,
-.el-sub-menu.is-active .el-sub-menu__title {
-    border: none !important;
-}
-/* 隐藏默认图标 */
-.el-menu--horizontal .el-sub-menu__title .el-sub-menu__icon-arrow {
-    display: none;
 }
 .el-drawer {
     --el-drawer-padding-primary: var(--el-dialog-padding-primary, 10px);

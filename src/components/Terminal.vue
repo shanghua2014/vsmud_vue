@@ -62,7 +62,7 @@ import {
     isExitButtonVisible,
     mudExitKeys
 } from '@/common/mudExitDirs';
-import { snapBr, mPg } from '@/common/mudBridgeDownlinkCore';
+import { snapBr, mPg, QUIT_ABANDON_PAT } from '@/common/mudBridgeDownlinkCore';
 import { useConfigStore } from '@/stores/store';
 import type { MudVue, BrPr, BrEx, BrRt } from '@/common/common';
 
@@ -168,10 +168,18 @@ const emits = defineEmits([
     'pnP',
     'psBoth',
     'pn2',
-    'mudSess'
+    'mudSess',
+    /** 文档菜单退出流程结束（清屏后父组件可返回站点列表） */
+    'quitListComplete'
 ]);
 
 const cfgStore = useConfigStore();
+
+/** 文档菜单「退出」：已发 quit，等待「放弃账号」提示以静默发 y，或超时后仍结束流程 */
+const quitListPending = ref(false);
+let quitListTimer: ReturnType<typeof setTimeout> | null = null;
+/** 发 quit 后未匹配到放弃账号提示则超时清屏（毫秒） */
+const QUIT_LIST_TIMEOUT_MS = 500;
 
 /** 连接建立 / 断开时收起所有菜单提示；`includeEmail: false` 用于菜单快捷发送后（保留邮箱提示状态） */
 function emitPrFalse(options: { includeEmail?: boolean } = {}) {
@@ -351,6 +359,14 @@ onMounted(() => {
         const raw = data.content ?? '';
         serverRawBuffer.value = `${serverRawBuffer.value}${raw}`.slice(-4096);
         const buf = serverRawBuffer.value;
+
+        if (quitListPending.value && QUIT_ABANDON_PAT.test(buf)) {
+            clearQuitListTimer();
+            base.sendMessage('y');
+            finishQuitToList();
+            return;
+        }
+
         const snap = snapBr(raw, buf);
 
         if (!bridgeCtl.value) {
@@ -393,6 +409,10 @@ onMounted(() => {
         }
     };
     onDisconnected = () => {
+        if (quitListPending.value) {
+            quitListPending.value = false;
+            clearQuitListTimer();
+        }
         ElMessage.info('MUD 连接已断开');
         resetMudExitDirs();
         pageMoreHidden.value = false;
@@ -655,7 +675,57 @@ const sendHbChoice = (command: string) => {
     emits('lHb', false);
 };
 
+/** 断开当前 MUD WebSocket（返回站点列表前调用） */
+const mudDisconnect = () => {
+    base.disconnect();
+};
+
+function clearQuitListTimer() {
+    if (quitListTimer) {
+        clearTimeout(quitListTimer);
+        quitListTimer = null;
+    }
+}
+
+/** 文档菜单退出流程收尾：清屏并发 quitListComplete（父组件返回站点列表） */
+function finishQuitToList() {
+    if (!quitListPending.value) return;
+    quitListPending.value = false;
+    clearQuitListTimer();
+    terminal.value?.clear();
+    serverRawBuffer.value = '';
+    inputBox.value = '';
+    emits('quitListComplete');
+}
+
+/** 文档菜单「退出」：先发 quit，匹配到放弃账号提示则静默发 y，否则超时后仍清屏 */
+function startQuitAndReturnList() {
+    if (quitListPending.value) return;
+    quitListPending.value = true;
+    base.sendMessage('quit');
+    clearQuitListTimer();
+    quitListTimer = setTimeout(() => finishQuitToList(), QUIT_LIST_TIMEOUT_MS);
+}
+
+/** 清空 xterm 屏幕与本地下行缓冲 */
+const clearTerminal = () => {
+    terminal.value?.clear();
+    serverRawBuffer.value = '';
+    inputBox.value = '';
+};
+
+/** 仅本地回显一行（不发往服务器），如「找花伯」冷却提示 */
+const printLocalLine = (text: string) => {
+    const t = terminal.value;
+    if (!t) return;
+    const safe = text.replace(/\x1b/g, '');
+    t.write(`\x1b[33m${safe}\x1b[0m\r\n`, () => {
+        scrollToBottom();
+    });
+};
+
 defineExpose({
+    startQuitAndReturnList,
     sendMq,
     sendXs,
     sendMz,
@@ -672,11 +742,16 @@ defineExpose({
     sendCeChoice,
     sendHbChoice,
     sendPgEnter,
-    sendPgEnd
+    sendPgEnd,
+    mudDisconnect,
+    clearTerminal,
+    printLocalLine
 });
 
 // 组件卸载时移除监听器
 onUnmounted(() => {
+    clearQuitListTimer();
+    quitListPending.value = false;
     removeScrollListener();
     if (onConnected) base.off('telnet-connected', onConnected);
     if (onError) base.off('telnet-error', onError);
