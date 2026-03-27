@@ -12,10 +12,75 @@
             showLeaveVillage ||
             showAskLaoHere ||
             showEmailPrompt ||
-            showPageMore
+            showPageMore ||
+            (showQuanMingPrompt && quanMingButtons.length > 0) ||
+            (showXingShiPrompt && surnameButtons.length > 0) ||
+            (showMingZiPrompt && mingZiButtons.length > 0) ||
+            (showPwdSuperPrompt && pwdSuperButtons.length > 0) ||
+            (showPwdNormalPrompt && pwdNormalButtons.length > 0)
         "
         class="mud-yn-actions pa"
     >
+        <template v-if="showQuanMingPrompt && quanMingButtons.length > 0">
+            <el-button
+                v-for="(label, i) in quanMingButtons"
+                :key="`qm-${i}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickQuanMing(label)"
+            >
+                {{ label }}
+            </el-button>
+        </template>
+        <template v-if="showXingShiPrompt && surnameButtons.length > 0">
+            <el-button
+                v-for="(ch, i) in surnameButtons"
+                :key="`xing-${ch}-${i}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickXingShi(ch)"
+            >
+                {{ ch }}
+            </el-button>
+        </template>
+        <template v-if="showMingZiPrompt && mingZiButtons.length > 0">
+            <el-button
+                v-for="(ch, i) in mingZiButtons"
+                :key="`ming-${ch}-${i}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickMingZi(ch)"
+            >
+                {{ ch }}
+            </el-button>
+        </template>
+        <template v-if="showPwdSuperPrompt && pwdSuperButtons.length > 0">
+            <el-button
+                v-for="(label, i) in pwdSuperButtons"
+                :key="`pwd-sup-${i}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickPwdSuper(label)"
+            >
+                {{ label }}
+            </el-button>
+        </template>
+        <template v-if="showPwdNormalPrompt && pwdNormalButtons.length > 0">
+            <el-button
+                v-for="(label, i) in pwdNormalButtons"
+                :key="`pwd-norm-${i}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickPwdNormal(label)"
+            >
+                {{ label }}
+            </el-button>
+        </template>
         <template v-if="showYnPrompt">
             <el-button size="small" type="primary" @click="pickYn('y')">是</el-button>
             <el-button size="small" type="primary" plain @click="pickYn('n')">否</el-button>
@@ -25,8 +90,8 @@
             <el-button size="small" type="primary" plain @click="pickMf('f')">女</el-button>
         </template>
         <template v-if="showKuaiyiPvpPve && !showChooseCharacter">
-            <el-button size="small" type="primary" @click="pickKuaiyiPvpPve(KUAIYI_CHOOSE_PVP_COMMAND)">快意恩仇-PVP</el-button>
-            <el-button size="small" type="primary" plain @click="pickKuaiyiPvpPve(KUAIYI_CHOOSE_PVE_COMMAND)">
+            <el-button size="small" type="primary" @click="pickKuaiyiPvpPve(KY_PVP_CMD)">快意恩仇-PVP</el-button>
+            <el-button size="small" type="primary" plain @click="pickKuaiyiPvpPve(KY_PVE_CMD)">
                 江湖隐士-PVE
             </el-button>
         </template>
@@ -131,6 +196,16 @@
     </el-menu>
     <el-drawer v-model="openSetting" :direction="setDirection" :with-header="false" class="pr">
         <template #default>
+            <el-row :gutter="20" class="drawer-row-dir">
+                <el-col :span="10">
+                    <el-card class="config-card drawer-dir-card">
+                        <div class="card-header flex drawer-dir-header">
+                            <span>方向区</span>
+                            <el-checkbox v-model="dirPanelDraft" size="small">显示</el-checkbox>
+                        </div>
+                    </el-card>
+                </el-col>
+            </el-row>
             <el-row :gutter="20">
                 <el-col :span="10">
                     <el-card class="config-card">
@@ -173,16 +248,15 @@
 import { ref, watch, onMounted } from 'vue';
 import { Document } from '@element-plus/icons-vue'; // 导入图标组件
 import { Base } from '../common/common';
-import {
-    INFO_TOPICS_COUNT,
-    KUAIYI_CHOOSE_PVE_COMMAND,
-    KUAIYI_CHOOSE_PVP_COMMAND
-} from '../common/mudDownlinkPrompts';
-import { Utils } from '../../utils/utils.js';
+import { INF_N, KY_PVE_CMD, KY_PVP_CMD } from '../common/mudDownlinkPrompts';
+import { Utils } from '../../utils/utils';
 import type { DrawerProps } from 'element-plus';
 
 // 定义 props 接收 cmd 参数
-const props = defineProps<{
+const props = withDefaults(
+    defineProps<{
+    /** 是否显示终端方向区（与父 v-model:dir-panel-on 同步） */
+    dirPanelOn?: boolean;
     cmd: string;
     showYnPrompt?: boolean;
     showMfPrompt?: boolean;
@@ -205,7 +279,39 @@ const props = defineProps<{
     showAskLaoHuabo?: boolean;
     /** 下行 [37m== 未完 时显示「下一页」「结束」 */
     showPageMore?: boolean;
-}>();
+    /** 桥接 [1;32m姓氏：与 surnameButtons 同时满足时显示 */
+    showXingShiPrompt?: boolean;
+    /** 由父组件根据卡片角色名拆分（3 字 1 钮，4 字 2 钮） */
+    surnameButtons?: string[];
+    /** 桥接 [1;33m名字：与 mingZiButtons 同时满足时显示 */
+    showMingZiPrompt?: boolean;
+    /** 角色名末尾两字拆成按钮 */
+    mingZiButtons?: string[];
+    /** 桥接 [2;37;0m请输入您的全名：与 quanMingButtons 同时满足时显示 */
+    showQuanMingPrompt?: boolean;
+    /** 完整角色名，通常一项 */
+    quanMingButtons?: string[];
+    /** 桥接：管理密码，与 pwdSuperButtons */
+    showPwdSuperPrompt?: boolean;
+    pwdSuperButtons?: string[];
+    /** 桥接：普通密码，与 pwdNormalButtons */
+    showPwdNormalPrompt?: boolean;
+    pwdNormalButtons?: string[];
+}>(),
+    {
+        dirPanelOn: true,
+        showXingShiPrompt: false,
+        surnameButtons: () => [],
+        showMingZiPrompt: false,
+        mingZiButtons: () => [],
+        showQuanMingPrompt: false,
+        quanMingButtons: () => [],
+        showPwdSuperPrompt: false,
+        pwdSuperButtons: () => [],
+        showPwdNormalPrompt: false,
+        pwdNormalButtons: () => []
+    }
+);
 
 const qq = ref(false);
 const newbie = ref(false);
@@ -239,6 +345,7 @@ const options = [
 
 // 定义 emit 事件
 const emits = defineEmits([
+    'update:dirPanelOn',
     'checkboxChange',
     'cancelSelection',
     'confirmSelection',
@@ -254,10 +361,15 @@ const emits = defineEmits([
     'closeEyeChoice',
     'laoHuaboChoice',
     'pageMoreChoice',
-    'pageEndChoice'
+    'pageEndChoice',
+    'xingShiChoice',
+    'mingZiChoice',
+    'quanMingChoice',
+    'pwdSuperChoice',
+    'pwdNormalChoice'
 ]);
 
-const infoTopicNumbers = Array.from({ length: INFO_TOPICS_COUNT }, (_, i) => i + 1);
+const infoTopicNumbers = Array.from({ length: INF_N }, (_, i) => i + 1);
 const infoTopicsExpanded = ref(false);
 
 /** label 可带与服务器一致的 ASCII/ANSI 片段，界面显示用 Utils.parseMudLabelForDisplay */
@@ -293,6 +405,12 @@ const listCategory = [
 // 抽屉组件的显示控制
 const openSetting = ref(false);
 const setDirection = ref<DrawerProps['direction']>('ttb');
+/** 方向区：仅抽屉内编辑，点「确定」后 emit 生效 */
+const dirPanelDraft = ref(props.dirPanelOn);
+
+watch(openSetting, (open) => {
+    if (open) dirPanelDraft.value = props.dirPanelOn;
+});
 
 onMounted(() => {
     divCount.value = form.value.category.length;
@@ -310,15 +428,14 @@ const openSet = () => {
     openSetting.value = true;
 };
 const cancel = () => {
-    // 触发 cancelSelection 事件，传递初始选中项
+    dirPanelDraft.value = props.dirPanelOn;
     emits('cancelSelection', initialCategories.value);
     openSetting.value = false;
 };
 
 const confirm = () => {
-    // 更新初始选中项
+    emits('update:dirPanelOn', dirPanelDraft.value);
     initialCategories.value = [...form.value.category];
-    // 触发 confirmSelection 事件，传递当前选中项
     emits('confirmSelection', form.value.category);
     openSetting.value = false;
 };
@@ -341,6 +458,26 @@ const pickPageMore = () => {
 
 const pickPageEnd = () => {
     emits('pageEndChoice');
+};
+
+const pickXingShi = (ch: string) => {
+    emits('xingShiChoice', ch);
+};
+
+const pickMingZi = (ch: string) => {
+    emits('mingZiChoice', ch);
+};
+
+const pickQuanMing = (fullName: string) => {
+    emits('quanMingChoice', fullName);
+};
+
+const pickPwdSuper = (pwd: string) => {
+    emits('pwdSuperChoice', pwd);
+};
+
+const pickPwdNormal = (pwd: string) => {
+    emits('pwdNormalChoice', pwd);
 };
 
 const pickCharacter = (cmd: string) => {
@@ -409,6 +546,18 @@ watch(
 .el-drawer.ttb {
     height: 25% !important;
 }
+.drawer-row-dir {
+    margin-bottom: 12px;
+}
+.drawer-dir-header {
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+}
+.drawer-dir-card {
+    width: 100%;
+    max-width: 100%;
+}
 .config-card {
     .el-card__body {
         padding: calc(var(--el-card-padding) - 5px);
@@ -446,7 +595,7 @@ ul.el-menu-demo {
     background: #1f1f1f;
     border: 1px solid var(--el-menu-border-color);
     justify-content: center;
-    z-index: 1;
+    z-index: 50;
     border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
 }
 .mud-yn-actions {
@@ -455,9 +604,10 @@ ul.el-menu-demo {
     max-width: calc(100% - 8px);
     right: 1px;
     bottom: 64px;
-    z-index: 2;
+    z-index: 50;
     gap: 6px;
     align-items: center;
+    pointer-events: auto;
 }
 /* 信息：数字区绝对定位浮在「信息」按钮正上方 */
 .mud-info-topics-block {

@@ -1,51 +1,49 @@
-import { reactive } from 'vue';
+import { ref, type Ref } from 'vue';
 
 /**
- * 本会话内「菜单区一次性提示」：用户处理过后或交叉规则压掉后，直到 {@link resetSession} 前不再显示。
- * 典型场景：Email、性格、老对长、washto、要了解的信息、老玩家出村等；与 mudSessionStart（重连）配对重置。
+ * 本会话内「菜单区一次性提示」：用户处理过后或交叉规则压掉后，直到 resetSession 前不再显示。
  */
-export const SessionOneShotKey = {
-    Email: 'email',
-    ChooseCharacter: 'chooseCharacter',
-    AskLaoHere: 'askLaoHere',
-    WashTo: 'washTo',
-    InfoTopics: 'infoTopics',
-    LeaveVillage: 'leaveVillage',
-    KuaiyiPvpPve: 'kuaiyiPvpPve',
-    CloseEye: 'closeEye',
-    AskLaoHuabo: 'askLaoHuabo',
-    CharacterExistsPassword: 'characterExistsPassword'
+export const S1 = {
+    Em: 'em',
+    ChSel: 'chSel',
+    Alh: 'alh',
+    Wash: 'wash',
+    InfT: 'infT',
+    LvV: 'lvV',
+    Ky: 'ky',
+    CEye: 'cEye',
+    LHb: 'lHb',
+    CxPwd: 'cxPwd',
+    XsNm: 'xsNm',
+    MzNm: 'mzNm',
+    QmNm: 'qmNm',
+    Ps: 'ps',
+    Pn: 'pn'
 } as const;
 
-export type SessionOneShotKey = (typeof SessionOneShotKey)[keyof typeof SessionOneShotKey];
+export type S1Key = (typeof S1)[keyof typeof S1];
 
-export type SessionOneShotPromptsApi = {
-    /** 是否已被本会话压掉（不再展示） */
-    isSuppressed: (key: SessionOneShotKey) => boolean;
-    /** 用户已处理或业务要求本会话内不再出现该提示 */
-    suppress: (key: SessionOneShotKey) => void;
-    /** 新 MUD 会话（如连接成功）：清空所有压掉状态 */
+export type S1Api = {
+    isSuppressed: (key: S1Key) => boolean;
+    suppress: (key: S1Key) => void;
     resetSession: () => void;
-    /** 服务端希望显示 && 尚未被压掉 */
-    shouldShow: (key: SessionOneShotKey, serverWantsVisible: boolean) => boolean;
+    shouldShow: (key: S1Key, serverWantsVisible: boolean) => boolean;
 };
 
-export function createSessionOneShotPrompts(): SessionOneShotPromptsApi {
-    const suppressed = reactive<Record<string, boolean>>({});
+export function createS1(): S1Api {
+    const suppressed: Ref<Record<string, boolean>> = ref({});
 
-    const isSuppressed = (key: SessionOneShotKey) => !!suppressed[key];
+    const isSuppressed = (key: S1Key) => !!suppressed.value[key];
 
-    const suppress = (key: SessionOneShotKey) => {
-        suppressed[key] = true;
+    const suppress = (key: S1Key) => {
+        suppressed.value = { ...suppressed.value, [key]: true };
     };
 
     const resetSession = () => {
-        for (const k of Object.keys(suppressed)) {
-            delete suppressed[k];
-        }
+        suppressed.value = {};
     };
 
-    const shouldShow = (key: SessionOneShotKey, serverWantsVisible: boolean) =>
+    const shouldShow = (key: S1Key, serverWantsVisible: boolean) =>
         serverWantsVisible && !isSuppressed(key);
 
     return { isSuppressed, suppress, resetSession, shouldShow };

@@ -1,11 +1,11 @@
 import iconv from 'iconv-lite';
 import { Buffer } from 'buffer';
 
-/** 国内 MUD 多为 GBK/GB18030；少数为 UTF-8 */
+/** 与 MUD 交互固定走 GB18030（iconv 库名；与 GBK 常用字节兼容） */
 export type MudCharset = 'gb18030' | 'utf8';
 
-export function normalizeMudCharset(raw?: string): MudCharset {
-    return raw === 'utf8' ? 'utf8' : 'gb18030';
+export function normalizeMudCharset(_raw?: string): MudCharset {
+    return 'gb18030';
 }
 
 export async function decodeMudPayload(

@@ -2,8 +2,46 @@
     <div class="common-layout pr" v-if="showLayout">
         <el-container>
             <el-main class="pr">
-                <!-- 使用简化后的方法名 -->
+                <!-- 终端先渲染，菜单/桥接浮动层后渲染并提高 z-index，避免被终端盖住 -->
+                <Terminal
+                    ref="terminalRef"
+                    :dir-panel-on="dirPanelOn"
+                    @showDownward="onShowDownward"
+                    @menuCommand="onMenuCmd"
+                    @sendCommandToChannel="sendToChannel"
+                    @yn="showYnPrompt = $event"
+                    @mf="showMfPrompt = $event"
+                    @em="onEmailPrompt"
+                    @chSel="onChSel"
+                    @alh="onAlh"
+                    @wash="onWash"
+                    @infT="onInfT"
+                    @lvV="onLvV"
+                    @ky="onKy"
+                    @cEye="onCEye"
+                    @lHb="onLHb"
+                    @pgM="onPgM"
+                    @xsP="xingShiSrv = $event"
+                    @mzP="mingZiSrv = $event"
+                    @qmP="quanMingSrv = $event"
+                    @psP="pwdSuperSrv = $event"
+                    @pnP="pwdNormalSrv = $event"
+                    @psBoth="pwdSuperBothPhasesSeenSrv = $event"
+                    @pn2="pwdNormalSecondSeenSrv = $event"
+                    @mudSess="onMudSess"
+                />
                 <Menu
+                    v-model:dir-panel-on="dirPanelOn"
+                    :show-xing-shi-prompt="showXingShiMenu"
+                    :surname-buttons="surnameButtons"
+                    :show-ming-zi-prompt="showMingZiMenu"
+                    :ming-zi-buttons="mingZiButtons"
+                    :show-quan-ming-prompt="showQuanMingMenu"
+                    :quan-ming-buttons="quanMingButtons"
+                    :show-pwd-super-prompt="showPwdSuperMenu"
+                    :pwd-super-buttons="pwdSuperButtons"
+                    :show-pwd-normal-prompt="showPwdNormalMenu"
+                    :pwd-normal-buttons="pwdNormalButtons"
                     :cmd="menuCmd"
                     :show-yn-prompt="showYnPrompt"
                     :show-mf-prompt="showMfPrompt"
@@ -33,26 +71,11 @@
                     :show-page-more="showPageMore"
                     @pageMoreChoice="onPageMoreChoice"
                     @pageEndChoice="onPageEndChoice"
-                />
-                <!-- 修改事件绑定名称 -->
-                <Terminal
-                    ref="terminalRef"
-                    @showDownward="onShowDownward"
-                    @menuCommand="onMenuCmd"
-                    @sendCommandToChannel="sendToChannel"
-                    @ynPrompt="showYnPrompt = $event"
-                    @mfPrompt="showMfPrompt = $event"
-                    @emailPrompt="onEmailPrompt"
-                    @chooseCharacterPrompt="onChooseCharacterPrompt"
-                    @askLaoHerePrompt="onAskLaoHerePrompt"
-                    @washToPrompt="onWashToPrompt"
-                    @infoTopicsPrompt="onInfoTopicsPrompt"
-                    @leaveVillagePrompt="onLeaveVillagePrompt"
-                    @kuaiyiPvpPvePrompt="onKuaiyiPvpPvePrompt"
-                    @closeEyePrompt="onCloseEyePrompt"
-                    @laoHuaboPrompt="onLaoHuaboPrompt"
-                    @pageMorePrompt="onPageMorePrompt"
-                    @mudSessionStart="onMudSessionStart"
+                    @xingShiChoice="onXingShiChoice"
+                    @mingZiChoice="onMingZiChoice"
+                    @quanMingChoice="onQuanMingChoice"
+                    @pwdSuperChoice="onPwdSuperChoice"
+                    @pwdNormalChoice="onPwdNormalChoice"
                 />
                 <Status />
             </el-main>
@@ -71,22 +94,57 @@ import Mudlist from './components/MudList.vue';
 import Menu from './components/Menu.vue';
 import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
-import { ref, computed, onUnmounted } from 'vue';
-import { loadSitesFromStorage, type SiteCard } from './common/common';
+import { ref, computed, watch, onUnmounted } from 'vue';
+import { ElMessage } from 'element-plus';
 import {
-    ASK_LAO_HERE_COMMAND,
-    ASK_LAO_LEAVE_VILLAGE_COMMAND,
-    CLOSE_EYE_COMMAND,
-    ASK_LAO_HUABO_COMMAND,
-    WASH_TO_CONFIRM_COMMAND,
-    buildInfoTopicChoiceCommand
+    loadSites,
+    loadDirPan,
+    saveDirPan,
+    nameToSurnameBtns,
+    nameToMingZiBtns,
+    nameToFullNameBtns,
+    pwdSuperBtns,
+    pwdNormBtns,
+    type SiteCard
+} from './common/common';
+import { storeToRefs } from 'pinia';
+import { useConfigStore } from './stores/store';
+import {
+    ALH_CMD,
+    LV_CMD,
+    CE_CMD,
+    HB_CMD,
+    WASH_CMD,
+    infTopicCmd
 } from './common/mudDownlinkPrompts';
-import { isInLaocunzhangRoom, resetMudRoomRecord } from './common/mudRoomRecord';
-import { createSessionOneShotPrompts, SessionOneShotKey } from './common/sessionOneShotPrompts';
+import { createS1, S1 } from './common/sessionOneShotPrompts';
+
+const { cfg } = storeToRefs(useConfigStore());
+/** 桥接 [1;32m姓氏：由当前站点卡片角色名拆成按钮 */
+const xingShiSrv = ref(false);
+const surnameButtons = computed(() => nameToSurnameBtns(cfg.value?.name));
+/** 桥接 [1;33m名字：角色名末两字 */
+const mingZiSrv = ref(false);
+const mingZiButtons = computed(() => nameToMingZiBtns(cfg.value?.name));
+const quanMingSrv = ref(false);
+const quanMingButtons = computed(() => nameToFullNameBtns(cfg.value?.name));
+const pwdSuperSrv = ref(false);
+const pwdSuperButtons = computed(() => pwdSuperBtns(cfg.value?.managePassword));
+const pwdNormalSrv = ref(false);
+const pwdNormalButtons = computed(() => pwdNormBtns(cfg.value?.password));
+/** 桥接：缓冲内是否已同时出现过两段密码提示（此时点击才收起菜单） */
+const pwdSuperBothPhasesSeenSrv = ref(false);
+const pwdNormalSecondSeenSrv = ref(false);
+/** 普通密码条点击次数：桥接未及时标二段时，第 2 次点击强制收起 */
+const pwdNormalMenuClickCount = ref(0);
+
+/** 设置抽屉内开关：是否显示终端方向区（持久化到 localStorage） */
+const dirPanelOn = ref(loadDirPan());
+watch(dirPanelOn, (on) => saveDirPan(on));
 
 const showLayout = ref(false);
 /** 与 localStorage（vsmud_sites）同步，首屏即可展示已保存站点 */
-const mudlist = ref<SiteCard[]>(loadSitesFromStorage());
+const mudlist = ref<SiteCard[]>(loadSites());
 const hideMenu = ref(false);
 const menuCmd = ref('');
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
@@ -95,34 +153,90 @@ const loadScript = ref('');
 const showYnPrompt = ref(false);
 const showMfPrompt = ref(false);
 /** 终端侧原始信号（未套「本会话只出现一次」） */
-const emailPromptFromServer = ref(false);
-const chooseCharacterFromServer = ref(false);
-const askLaoHereFromServer = ref(false);
-const washToFromServer = ref(false);
-const leaveVillageFromServer = ref(false);
-const kuaiyiPvpPveFromServer = ref(false);
-const closeEyeFromServer = ref(false);
-const askLaoHuaboFromServer = ref(false);
+const emailSrv = ref(false);
+const chooseCharSrv = ref(false);
+const askLaoSrv = ref(false);
+const washToSrv = ref(false);
+/** 终端下行「要了解的信息」提示 */
+const infTSrv = ref(false);
+const leaveSrv = ref(false);
+const kuaiyiSrv = ref(false);
+const closeEyeSrv = ref(false);
+const huaboSrv = ref(false);
 /** 终端下行 [37m== 未完：菜单栏「下一页」「结束」 */
-const pageMoreFromServer = ref(false);
-const sessionOneShot = createSessionOneShotPrompts();
+const pageMoreSrv = ref(false);
+const s1 = createS1();
+
+/** 姓名三步：桥接互斥（全名 > 名字 > 姓氏）且各步点选一次后本会话不再显示 */
+const quanMingVisible = computed(() =>
+    s1.shouldShow(S1.QmNm, quanMingSrv.value)
+);
+const mingZiVisible = computed(() =>
+    s1.shouldShow(S1.MzNm, mingZiSrv.value)
+);
+const xingShiVisible = computed(() =>
+    s1.shouldShow(S1.XsNm, xingShiSrv.value)
+);
+const pwdSuperVisible = computed(() =>
+    s1.shouldShow(S1.Ps, pwdSuperSrv.value)
+);
+const pwdNormalVisible = computed(() =>
+    s1.shouldShow(S1.Pn, pwdNormalSrv.value)
+);
+
+const showQuanMingMenu = computed(
+    () => quanMingVisible.value && !pwdSuperVisible.value && !pwdNormalVisible.value
+);
+const showMingZiMenu = computed(
+    () =>
+        mingZiVisible.value &&
+        !quanMingVisible.value &&
+        !pwdSuperVisible.value &&
+        !pwdNormalVisible.value
+);
+const showXingShiMenu = computed(
+    () =>
+        xingShiVisible.value &&
+        !mingZiVisible.value &&
+        !quanMingVisible.value &&
+        !pwdSuperVisible.value &&
+        !pwdNormalVisible.value
+);
+
+/** 与姓名/全名条互斥：桥接五选一；各步点选一次后本会话不再显示 */
+const showPwdSuperMenu = computed(
+    () =>
+        pwdSuperVisible.value &&
+        !quanMingVisible.value &&
+        !mingZiVisible.value &&
+        !xingShiVisible.value &&
+        !pwdNormalVisible.value
+);
+const showPwdNormalMenu = computed(
+    () =>
+        pwdNormalVisible.value &&
+        !quanMingVisible.value &&
+        !mingZiVisible.value &&
+        !xingShiVisible.value &&
+        !pwdSuperVisible.value
+);
 
 /** 菜单区性格四选一：服务端有提示且本会话内尚未选过 */
 const showChooseChar = computed(() =>
-    sessionOneShot.shouldShow(SessionOneShotKey.ChooseCharacter, chooseCharacterFromServer.value)
+    s1.shouldShow(S1.ChSel, chooseCharSrv.value)
 );
 
 /** 快意恩仇 PVP / 江湖隐士 PVE；性格四选一时让位 */
 const showKuaiyiPvpPve = computed(
     () =>
-        sessionOneShot.shouldShow(SessionOneShotKey.KuaiyiPvpPve, kuaiyiPvpPveFromServer.value) &&
+        s1.shouldShow(S1.Ky, kuaiyiSrv.value) &&
         !showChooseChar.value
 );
 
 /** 下行含 closeeye 与「）」；性格四选一时让位；快意恩仇条出现时让位 */
 const showCloseEye = computed(
     () =>
-        sessionOneShot.shouldShow(SessionOneShotKey.CloseEye, closeEyeFromServer.value) &&
+        s1.shouldShow(S1.CEye, closeEyeSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value
 );
@@ -130,7 +244,7 @@ const showCloseEye = computed(
 /** 「老村长嘱咐道：」下行；性格/快意恩仇/闭眼 条出现时让位 */
 const showAskLaoHuabo = computed(
     () =>
-        sessionOneShot.shouldShow(SessionOneShotKey.AskLaoHuabo, askLaoHuaboFromServer.value) &&
+        s1.shouldShow(S1.LHb, huaboSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value
@@ -139,7 +253,7 @@ const showAskLaoHuabo = computed(
 /** washto 指令格式提示：确定按钮；性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
 const showWashTo = computed(
     () =>
-        sessionOneShot.shouldShow(SessionOneShotKey.WashTo, washToFromServer.value) &&
+        s1.shouldShow(S1.Wash, washToSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
@@ -149,7 +263,7 @@ const showWashTo = computed(
 /** 菜单区「老对长」：下行匹配 ask lao 提示且本会话未点过；性格/washto/PVP·PVE/闭眼/找花伯 条出现时让位 */
 const showAskLao = computed(
     () =>
-        sessionOneShot.shouldShow(SessionOneShotKey.AskLaoHere, askLaoHereFromServer.value) &&
+        s1.shouldShow(S1.Alh, askLaoSrv.value) &&
         !showChooseChar.value &&
         !showWashTo.value &&
         !showKuaiyiPvpPve.value &&
@@ -157,24 +271,20 @@ const showAskLao = computed(
         !showAskLaoHuabo.value
 );
 
-/**
- * 「信息」：一旦下行命中「要了解的信息」并记入老村长房间后显示，直至离开判定/重连；
- * 不再依赖缓冲里是否仍含该片段。性格/PVP·PVE/闭眼/找花伯 条出现时让位。
- */
+/** 「信息」：下行 `infT` 且本会话未 suppress；性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
 const showInfoTopics = computed(
     () =>
-        isInLaocunzhangRoom.value &&
+        s1.shouldShow(S1.InfT, infTSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
         !showAskLaoHuabo.value
 );
 
-/** 老玩家出村：仅推断在老村长房间时显示；性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
+/** 老玩家出村：性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
 const showLeaveVillage = computed(
     () =>
-        isInLaocunzhangRoom.value &&
-        sessionOneShot.shouldShow(SessionOneShotKey.LeaveVillage, leaveVillageFromServer.value) &&
+        s1.shouldShow(S1.LvV, leaveSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
@@ -183,12 +293,12 @@ const showLeaveVillage = computed(
 
 /** 菜单栏「下一页」：性格四选一时让位 */
 const showPageMore = computed(
-    () => pageMoreFromServer.value && !showChooseChar.value
+    () => pageMoreSrv.value && !showChooseChar.value
 );
 
 /** 菜单区 Email：服务端有提示且本会话未点过、其它菜单条显示时让位 */
 const showEmailMenu = computed(() => {
-    const emailVisible = sessionOneShot.shouldShow(SessionOneShotKey.Email, emailPromptFromServer.value);
+    const emailVisible = s1.shouldShow(S1.Em, emailSrv.value);
     return (
         emailVisible &&
         !showChooseChar.value &&
@@ -202,18 +312,23 @@ const showEmailMenu = computed(() => {
     );
 });
 const terminalRef = ref<{
-    sendMudQuick?: (cmd: string) => void;
-    focusEmailInput?: () => void;
-    sendCharacterChoice?: (cmd: string) => void;
-    sendAskLaoHereChoice?: (cmd: string) => void;
-    sendWashToChoice?: (cmd: string) => void;
-    sendInfoTopicChoice?: (cmd: string) => void;
-    sendLeaveVillageChoice?: (cmd: string) => void;
-    sendKuaiyiPvpPveChoice?: (cmd: string) => void;
-    sendCloseEyeChoice?: (cmd: string) => void;
-    sendLaoHuaboChoice?: (cmd: string) => void;
-    sendNextPageEnter?: () => void;
-    sendPageEndQuit?: () => void;
+    sendMq?: (cmd: string) => void;
+    sendXs?: (ch: string) => void;
+    sendMz?: (ch: string) => void;
+    sendQm?: (fullName: string) => void;
+    sendPs?: (pwd: string, finalize?: boolean) => void;
+    sendPn?: (pwd: string, finalize?: boolean) => void;
+    sendRegEm?: (email: string) => void;
+    sendChSel?: (cmd: string) => void;
+    sendAlhChoice?: (cmd: string) => void;
+    sendWashChoice?: (cmd: string) => void;
+    sendInfTopicChoice?: (cmd: string) => void;
+    sendLvChoice?: (cmd: string) => void;
+    sendKyChoice?: (cmd: string) => void;
+    sendCeChoice?: (cmd: string) => void;
+    sendHbChoice?: (cmd: string) => void;
+    sendPgEnter?: () => void;
+    sendPgEnd?: () => void;
 } | null>(null);
 
 // 修改 sendToChannel 函数中使用的变量名
@@ -254,118 +369,167 @@ const onConfirm = (value: string[]) => {
 };
 
 const onYnChoice = (v: 'y' | 'n') => {
-    terminalRef.value?.sendMudQuick?.(v);
+    terminalRef.value?.sendMq?.(v);
     showYnPrompt.value = false;
 };
 
 const onMfChoice = (v: 'm' | 'f') => {
-    terminalRef.value?.sendMudQuick?.(v);
+    terminalRef.value?.sendMq?.(v);
     showMfPrompt.value = false;
 };
 
 const onEmailPrompt = (v: boolean) => {
-    emailPromptFromServer.value = v;
+    emailSrv.value = v;
 };
 
 const onEmailChoice = () => {
-    terminalRef.value?.focusEmailInput?.();
-    sessionOneShot.suppress(SessionOneShotKey.Email);
+    const email = cfg.value?.email?.trim();
+    if (!email) {
+        ElMessage.warning('请先在站点卡片填写 Email');
+        return;
+    }
+    terminalRef.value?.sendRegEm?.(email);
+    s1.suppress(S1.Em);
 };
 
-const onChooseCharacterPrompt = (v: boolean) => {
-    chooseCharacterFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onChSel = (v: boolean) => {
+    chooseCharSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onAskLaoHerePrompt = (v: boolean) => {
-    askLaoHereFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onAlh = (v: boolean) => {
+    askLaoSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onWashToPrompt = (v: boolean) => {
-    washToFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onWash = (v: boolean) => {
+    washToSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onInfoTopicsPrompt = (v: boolean) => {
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onInfT = (v: boolean) => {
+    infTSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onLeaveVillagePrompt = (v: boolean) => {
-    leaveVillageFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onLvV = (v: boolean) => {
+    leaveSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onKuaiyiPvpPvePrompt = (v: boolean) => {
-    kuaiyiPvpPveFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onKy = (v: boolean) => {
+    kuaiyiSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onCloseEyePrompt = (v: boolean) => {
-    closeEyeFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onCEye = (v: boolean) => {
+    closeEyeSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onLaoHuaboPrompt = (v: boolean) => {
-    askLaoHuaboFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onLHb = (v: boolean) => {
+    huaboSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
-const onPageMorePrompt = (v: boolean) => {
-    pageMoreFromServer.value = v;
-    if (v) sessionOneShot.suppress(SessionOneShotKey.Email);
+const onPgM = (v: boolean) => {
+    pageMoreSrv.value = v;
+    if (v) s1.suppress(S1.Em);
 };
 
 const onPageMoreChoice = () => {
-    terminalRef.value?.sendNextPageEnter?.();
+    terminalRef.value?.sendPgEnter?.();
 };
 
 const onPageEndChoice = () => {
-    terminalRef.value?.sendPageEndQuit?.();
+    terminalRef.value?.sendPgEnd?.();
 };
 
-const onMudSessionStart = () => {
-    sessionOneShot.resetSession();
-    resetMudRoomRecord();
+const onMudSess = () => {
+    s1.resetSession();
+    xingShiSrv.value = false;
+    mingZiSrv.value = false;
+    quanMingSrv.value = false;
+    pwdSuperSrv.value = false;
+    pwdNormalSrv.value = false;
+    pwdSuperBothPhasesSeenSrv.value = false;
+    pwdNormalSecondSeenSrv.value = false;
+    pwdNormalMenuClickCount.value = 0;
+};
+
+const onXingShiChoice = (ch: string) => {
+    terminalRef.value?.sendXs?.(ch);
+    s1.suppress(S1.XsNm);
+};
+
+const onMingZiChoice = (ch: string) => {
+    terminalRef.value?.sendMz?.(ch);
+    s1.suppress(S1.MzNm);
+};
+
+const onQuanMingChoice = (fullName: string) => {
+    terminalRef.value?.sendQm?.(fullName);
+    s1.suppress(S1.QmNm);
+};
+
+const onPwdSuperChoice = (pwd: string) => {
+    const finalize = pwdSuperBothPhasesSeenSrv.value;
+    terminalRef.value?.sendPs?.(pwd, finalize);
+    if (finalize) {
+        s1.suppress(S1.Ps);
+        pwdSuperSrv.value = false;
+    }
+};
+
+const onPwdNormalChoice = (pwd: string) => {
+    pwdNormalMenuClickCount.value += 1;
+    const finalize =
+        pwdNormalSecondSeenSrv.value || pwdNormalMenuClickCount.value >= 2;
+    terminalRef.value?.sendPn?.(pwd, finalize);
+    if (finalize) {
+        s1.suppress(S1.Pn);
+        pwdNormalSrv.value = false;
+        pwdNormalMenuClickCount.value = 0;
+    }
 };
 
 const onCharacterChoice = (cmd: string) => {
-    terminalRef.value?.sendCharacterChoice?.(cmd);
-    sessionOneShot.suppress(SessionOneShotKey.ChooseCharacter);
+    terminalRef.value?.sendChSel?.(cmd);
+    s1.suppress(S1.ChSel);
 };
 
 const onAskLaoHereChoice = () => {
-    terminalRef.value?.sendAskLaoHereChoice?.(ASK_LAO_HERE_COMMAND);
-    sessionOneShot.suppress(SessionOneShotKey.AskLaoHere);
+    terminalRef.value?.sendAlhChoice?.(ALH_CMD);
+    s1.suppress(S1.Alh);
 };
 
 const onWashToChoice = () => {
-    terminalRef.value?.sendWashToChoice?.(WASH_TO_CONFIRM_COMMAND);
-    sessionOneShot.suppress(SessionOneShotKey.WashTo);
+    terminalRef.value?.sendWashChoice?.(WASH_CMD);
+    s1.suppress(S1.Wash);
 };
 
 const onInfoTopicChoice = (index: number) => {
-    terminalRef.value?.sendInfoTopicChoice?.(buildInfoTopicChoiceCommand(index));
+    terminalRef.value?.sendInfTopicChoice?.(infTopicCmd(index));
 };
 
 const onLeaveVillageChoice = () => {
-    terminalRef.value?.sendLeaveVillageChoice?.(ASK_LAO_LEAVE_VILLAGE_COMMAND);
-    sessionOneShot.suppress(SessionOneShotKey.LeaveVillage);
+    terminalRef.value?.sendLvChoice?.(LV_CMD);
+    s1.suppress(S1.LvV);
 };
 
 const onKuaiyiPvpPveChoice = (cmd: string) => {
-    terminalRef.value?.sendKuaiyiPvpPveChoice?.(cmd);
-    sessionOneShot.suppress(SessionOneShotKey.KuaiyiPvpPve);
+    terminalRef.value?.sendKyChoice?.(cmd);
+    s1.suppress(S1.Ky);
 };
 
 const onCloseEyeChoice = () => {
-    terminalRef.value?.sendCloseEyeChoice?.(CLOSE_EYE_COMMAND);
-    sessionOneShot.suppress(SessionOneShotKey.CloseEye);
+    terminalRef.value?.sendCeChoice?.(CE_CMD);
+    s1.suppress(S1.CEye);
 };
 
 const onLaoHuaboChoice = () => {
-    terminalRef.value?.sendLaoHuaboChoice?.(ASK_LAO_HUABO_COMMAND);
-    sessionOneShot.suppress(SessionOneShotKey.AskLaoHuabo);
+    terminalRef.value?.sendHbChoice?.(HB_CMD);
+    s1.suppress(S1.LHb);
 };
 
 onUnmounted(() => {

@@ -5,66 +5,198 @@ export interface Message {
     content: any; // ??????????
 }
 
-const SITES_STORAGE_KEY = 'vsmud_sites';
+const sitesKey = 'vsmud_sites';
+
+/** 终端方向区是否显示（与 App 设置抽屉同步） */
+const dirPanKey = 'vsmud_dir_panel_on';
+
+export function loadDirPan(): boolean {
+    try {
+        const raw = localStorage.getItem(dirPanKey);
+        if (raw === null) return true;
+        if (raw === '1' || raw === 'true') return true;
+        if (raw === '0' || raw === 'false') return false;
+        const p = JSON.parse(raw) as unknown;
+        return typeof p === 'boolean' ? p : true;
+    } catch {
+        return true;
+    }
+}
+
+export function saveDirPan(on: boolean): void {
+    try {
+        localStorage.setItem(dirPanKey, on ? '1' : '0');
+    } catch {
+        /* ignore quota / private mode */
+    }
+}
 
 export interface SiteCard {
     title: string;
     ip: string;
     port: string;
     account: string;
+    /** 登录用普通密码 */
     password: string;
+    /** 管理密码（与「普通密码」区分，仅存站点卡片） */
+    managePassword: string;
     name: string;
+    /** 登录用 Email，站点卡片必填 */
+    email: string;
     /** WebSocket ????? "/" */
     wsPath?: string;
-    /** ?????????? MUD ?? gb18030?GBK ?????? utf8 */
+    /** 遗留字段；读写均按 GB18030，不再提供 UTF-8 选项 */
     charset?: MudCharset;
     isEditing?: boolean;
 }
 
-export function loadSitesFromStorage(): SiteCard[] {
+export function loadSites(): SiteCard[] {
     try {
-        const raw = localStorage.getItem(SITES_STORAGE_KEY);
+        const raw = localStorage.getItem(sitesKey);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((s: Partial<SiteCard>) => ({
+            ...s,
+            managePassword: s.managePassword ?? '',
+            email: s.email ?? ''
+        })) as SiteCard[];
     } catch {
         return [];
     }
 }
 
-function saveSitesToStorage(sites: SiteCard[]) {
-    localStorage.setItem(SITES_STORAGE_KEY, JSON.stringify(sites));
+function saveSites(sites: SiteCard[]) {
+    localStorage.setItem(sitesKey, JSON.stringify(sites));
 }
 
-function siteStableId(s: Pick<SiteCard, 'account' | 'ip' | 'port'>): string {
+/**
+ * 桥接「姓氏」提示时：3 字角色名取第 1 字，4 字取前 2 字，各为按钮发送内容。
+ */
+export function nameToSurnameBtns(name: string | undefined | null): string[] {
+    const t = (name ?? '').trim();
+    if (!t) return [];
+    const chars = [...t];
+    if (chars.length === 2) return [chars[0]!];
+    if (chars.length === 3) return [chars[0]!];
+    if (chars.length === 4) return [chars[0]!, chars[1]!];
+    return [];
+}
+
+/**
+ * 桥接「名字」提示：均为 1 个按钮。
+ * 2 字名：末 1 字；3 / 4 字名：末 2 字拼成一条（点选一次发出两字）。
+ */
+export function nameToMingZiBtns(name: string | undefined | null): string[] {
+    const t = (name ?? '').trim();
+    const chars = [...t];
+    if (chars.length < 2) return [];
+    if (chars.length === 2) return [chars[1]!];
+    if (chars.length === 3) return [`${chars[1]}${chars[2]}`];
+    if (chars.length === 4) return [`${chars[2]}${chars[3]}`];
+    return [];
+}
+
+/** 桥接「请输入您的全名」：一个按钮，文案为卡片角色名全文 */
+export function nameToFullNameBtns(name: string | undefined | null): string[] {
+    const t = (name ?? '').trim();
+    if (!t) return [];
+    return [t];
+}
+
+function siteId(s: Pick<SiteCard, 'account' | 'ip' | 'port'>): string {
     const acc = s.account?.trim();
     if (acc) return acc;
     return `${s.ip?.trim() ?? ''}:${s.port?.trim() ?? ''}`;
 }
 
+/** 桥接层 mud-bridge-control 下发的提示快照（与 scripts 内字段名一致） */
+export interface BrPr {
+    yn: boolean;
+    mf: boolean;
+    em: boolean;
+    chSel: boolean;
+    alh: boolean;
+    wash: boolean;
+    infT: boolean;
+    lvV: boolean;
+    ky: boolean;
+    cEye: boolean;
+    lHb: boolean;
+    cxPwd: boolean;
+    pgM: boolean;
+    rcD: boolean;
+    xsP: boolean;
+    mzP: boolean;
+    qmP: boolean;
+    psP?: boolean;
+    pnP?: boolean;
+    psBoth?: boolean;
+    pn2?: boolean;
+    lgPwdL?: boolean;
+    enNmL?: boolean;
+    qNew?: boolean;
+    qDet?: boolean;
+}
+
+/** 桥接管理密码：单按钮 */
+export function pwdSuperBtns(managePassword: string | undefined | null): string[] {
+    const t = (managePassword ?? '').trim();
+    if (!t) return [];
+    return [t];
+}
+
+/** 桥接普通密码：单按钮 */
+export function pwdNormBtns(password: string | undefined | null): string[] {
+    const t = (password ?? '').trim();
+    if (!t) return [];
+    return [t];
+}
+
+/** 桥接层解析的出口 */
+export interface BrEx {
+    /** null：未命中；[]：无出口；非空：当前房间出口键 */
+    sk: string[] | null;
+}
+
+/** 桥接层解析的状态行房间名 */
+export interface BrRt {
+    /** null：未命中；非空：Look 按钮文案 */
+    nm: string | null;
+}
+
+export type MudVue =
+    | { type: 'mud'; content: string }
+    | {
+          type: 'bridge-control';
+          prompts: BrPr;
+          exits?: BrEx;
+          roomTitle?: BrRt;
+      };
+
 type MudEventName = 'telnet-connected' | 'telnet-error' | 'to-vue' | 'telnet-disconnected';
 type MudEventPayload = {
     'telnet-connected': undefined;
     'telnet-error': string;
-    'to-vue': { type: string; content: string };
+    'to-vue': MudVue;
     'telnet-disconnected': undefined;
 };
 
-let mudSocket: WebSocket | null = null;
-let activeMudCharset: MudCharset = 'gb18030';
-const mudEventMap: Record<MudEventName, Set<(payload: any) => void>> = {
+let ws: WebSocket | null = null;
+let mudCs: MudCharset = 'gb18030';
+const evMap: Record<MudEventName, Set<(payload: any) => void>> = {
     'telnet-connected': new Set(),
     'telnet-error': new Set(),
     'to-vue': new Set(),
     'telnet-disconnected': new Set()
 };
 
-function emitMudEvent<K extends MudEventName>(event: K, payload: MudEventPayload[K]) {
-    mudEventMap[event].forEach((listener) => listener(payload));
+function emitEv<K extends MudEventName>(event: K, payload: MudEventPayload[K]) {
+    evMap[event].forEach((listener) => listener(payload));
 }
 
 /** ip ?? ws:// / wss:// ???????? host:port ? path */
-function toWsUrl(ip: string, port: string | number, path = '/'): string {
+function mkWsUrl(ip: string, port: string | number, path = '/'): string {
     const target = `${ip}`.trim();
     const p = path.startsWith('/') ? path : `/${path}`;
     if (/^wss?:\/\//i.test(target)) {
@@ -95,40 +227,42 @@ export class Base {
     public sendSiteList(msg: Message) {
         if (msg.type === 'del') {
             const c = msg.content as SiteCard;
-            const id = siteStableId(c);
+            const id = siteId(c);
             if (!id || id === ':') return;
-            saveSitesToStorage(loadSitesFromStorage().filter((s) => siteStableId(s) !== id));
+            saveSites(loadSites().filter((s) => siteId(s) !== id));
             return;
         }
         if (msg.type === 'save') {
             const c = msg.content as SiteCard;
             if (!c?.ip?.trim() || !c?.port?.trim()) return;
-            const id = siteStableId(c);
-            const sites = loadSitesFromStorage();
-            const idx = sites.findIndex((s) => siteStableId(s) === id);
+            const id = siteId(c);
+            const sites = loadSites();
+            const idx = sites.findIndex((s) => siteId(s) === id);
             const next: SiteCard = {
                 title: c.title,
                 ip: c.ip,
                 port: c.port,
                 account: c.account ?? '',
                 password: c.password ?? '',
+                managePassword: c.managePassword ?? '',
                 name: c.name,
+                email: c.email ?? '',
                 wsPath: c.wsPath,
-                charset: c.charset,
+                charset: 'gb18030',
                 isEditing: false
             };
             if (idx >= 0) sites[idx] = { ...sites[idx], ...next };
             else sites.push(next);
-            saveSitesToStorage(sites);
+            saveSites(sites);
         }
     }
 
     public on<K extends MudEventName>(event: K, listener: (payload: MudEventPayload[K]) => void) {
-        mudEventMap[event].add(listener as (payload: any) => void);
+        evMap[event].add(listener as (payload: any) => void);
     }
 
     public off<K extends MudEventName>(event: K, listener: (payload: MudEventPayload[K]) => void) {
-        mudEventMap[event].delete(listener as (payload: any) => void);
+        evMap[event].delete(listener as (payload: any) => void);
     }
 
     public connect(msg: Message) {
@@ -138,64 +272,96 @@ export class Base {
         const wsPath = site?.wsPath?.trim() || '/';
         const fullWsUrl = Boolean(host && /^wss?:\/\//i.test(host));
         if (!fullWsUrl && (!host || !port)) {
-            emitMudEvent('telnet-error', '????????????');
+            emitEv('telnet-error', '????????????');
             return;
         }
-        activeMudCharset = normalizeMudCharset(site?.charset);
-        if (mudSocket && mudSocket.readyState <= WebSocket.OPEN) {
-            mudSocket.close();
+        mudCs = normalizeMudCharset(site?.charset);
+        if (ws && ws.readyState <= WebSocket.OPEN) {
+            ws.close();
         }
-        const wsUrl = fullWsUrl ? host! : toWsUrl(host!, port!, wsPath);
+        const wsUrl = fullWsUrl ? host! : mkWsUrl(host!, port!, wsPath);
         let opened = false;
         let socket: WebSocket;
         try {
             socket = new WebSocket(wsUrl);
             socket.binaryType = 'arraybuffer';
-            mudSocket = socket;
+            ws = socket;
         } catch (err) {
-            emitMudEvent('telnet-error', `?? WebSocket ??: ${String(err)}`);
+            emitEv('telnet-error', `?? WebSocket ??: ${String(err)}`);
             return;
         }
         socket.onopen = () => {
             opened = true;
-            emitMudEvent('telnet-connected', undefined);
+            emitEv('telnet-connected', undefined);
         };
         socket.onerror = () => {
             console.warn('[vsmud] WebSocket error:', wsUrl);
         };
         socket.onclose = (ev) => {
-            if (mudSocket === socket) mudSocket = null;
+            if (ws === socket) ws = null;
             if (opened) {
-                emitMudEvent('telnet-disconnected', undefined);
+                emitEv('telnet-disconnected', undefined);
                 return;
             }
             const hint =
                 ev.code === 1006
                     ? '??????????? WebSocket ?????? Telnet/TCP???? npm run mud-bridge ????'
                     : '';
-            emitMudEvent(
+            emitEv(
                 'telnet-error',
                 `???? WebSocket: ${wsUrl}  code=${ev.code}${ev.reason ? ` ${ev.reason}` : ''}${hint}`
             );
         };
         socket.onmessage = async (event) => {
+            const payload = event.data;
+            if (typeof payload === 'string') {
+                try {
+                    const parsed = JSON.parse(payload) as {
+                        v?: number;
+                        channel?: string;
+                        prompts?: BrPr;
+                        exits?: BrEx;
+                        roomTitle?: BrRt;
+                    };
+                    if (
+                        parsed?.v === 1 &&
+                        parsed?.channel === 'vsmud-control' &&
+                        parsed.prompts &&
+                        typeof parsed.prompts === 'object'
+                    ) {
+                        emitEv('to-vue', {
+                            type: 'bridge-control',
+                            prompts: parsed.prompts as BrPr,
+                            ...(parsed.exits && typeof parsed.exits === 'object'
+                                ? { exits: parsed.exits as BrEx }
+                                : {}),
+                            ...(parsed.roomTitle && typeof parsed.roomTitle === 'object'
+                                ? { roomTitle: parsed.roomTitle as BrRt }
+                                : {})
+                        });
+                    }
+                } catch {
+                    /* 非 JSON 文本忽略 */
+                }
+                return;
+            }
             const content = await decodeMudPayload(
-                event.data as string | ArrayBuffer | Blob,
-                activeMudCharset
+                payload as ArrayBuffer | Blob,
+                mudCs
             );
-            emitMudEvent('to-vue', { type: 'mud', content });
+            emitEv('to-vue', { type: 'mud', content });
         };
     }
 
     public disconnect() {
-        if (!mudSocket) return;
-        mudSocket.close();
-        mudSocket = null;
+        if (!ws) return;
+        ws.close();
+        ws = null;
     }
 
     public sendMessage(cmd: string) {
-        if (!mudSocket || mudSocket.readyState !== WebSocket.OPEN) return;
-        mudSocket.send(encodeMudLine(`${cmd}\r\n`, activeMudCharset));
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(encodeMudLine(`${cmd}\r\n`, mudCs));
     }
 }
 

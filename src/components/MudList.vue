@@ -16,20 +16,19 @@
                     <p class="chartreuse">服务器：{{ card.ip }}</p>
                     <p class="chartreuse">端口：{{ card.port }}</p>
                     <p class="yellow">账号：{{ card.account }}</p>
-                    <p class="blueviolet">密码：{{ card.password }}</p>
+                    <p class="purple">普通密码：{{ card.password }}</p>
+                    <p class="blueviolet">管理密码：{{ card.managePassword }}</p>
+                    <p class="aqua">Email：{{ card.email }}</p>
                     <p>角色：{{ card.name }}</p>
-                    <p class="chartreuse">编码：{{ card.charset === 'utf8' ? 'UTF-8' : 'GBK/GB18030' }}</p>
                 </template>
                 <template v-else>
                     <input v-model="card.ip" placeholder="服务器" />
                     <input v-model="card.port" placeholder="端口" />
-                    <input v-model="card.account" placeholder="账号" :disabled="!isCreated" />
-                    <input v-model="card.password" placeholder="密码（非必填）" />
-                    <input v-model="card.name" placeholder="角色" />
-                    <el-select v-model="card.charset" placeholder="文本编码" size="small" style="width: 100%; margin-top: 4px">
-                        <el-option label="GBK/GB18030（国内 MUD 常用）" value="gb18030" />
-                        <el-option label="UTF-8" value="utf8" />
-                    </el-select>
+                    <input v-model="card.account" placeholder="账号（3～8个英文字母）" :disabled="!isCreated" />
+                    <input v-model="card.password" placeholder="普通密码" />
+                    <input v-model="card.managePassword" placeholder="管理密码" />
+                    <input v-model="card.email" type="email" placeholder="Email（必填）" autocomplete="email" />
+                    <input v-model="card.name" placeholder="角色（2～4个汉字）" />
                 </template>
                 <div class="edit-box pa" v-if="!card.isEditing && cardClick">
                     <!-- 删除按钮 -->
@@ -52,7 +51,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Edit, CloseBold, Plus, Delete } from '@element-plus/icons-vue';
 import { Base } from '@/common/common';
@@ -74,9 +73,9 @@ interface CardModel {
     port: string;
     account: string;
     password: string;
+    managePassword: string;
     name: string;
-    /** 与 common SiteCard.charset 一致 */
-    charset?: 'gb18030' | 'utf8';
+    email: string;
 }
 
 // 定义 props 接收父级传递的 mudlist 数据
@@ -103,7 +102,8 @@ watch(
     (list) => {
         cards.value = (list ?? []).map((c) => ({
             ...c,
-            charset: c.charset ?? 'gb18030',
+            managePassword: c.managePassword ?? '',
+            email: c.email ?? '',
             isEditing: Boolean(c.isEditing)
         }));
     },
@@ -132,8 +132,9 @@ const add = () => {
         port: '',
         account: '',
         password: '',
-        name: '',
-        charset: 'gb18030'
+        managePassword: '',
+        email: '',
+        name: ''
     });
     allowClick.value = false;
     isCreated.value = true;
@@ -145,16 +146,60 @@ const toggleEdit = (card: any, edit: boolean) => {
     allowClick.value = !card.isEditing;
 };
 
+/** 非空时至少 6 位（与占位「非必填」一致：可留空） */
+const MIN_PASSWORD_LEN = 6;
+
+/** 账号：3～8 个英文字母（A–Z、a–z） */
+function validateAccount(account: string): string | null {
+    if (!/^[a-zA-Z]{3,8}$/.test(account)) {
+        return '账号须为 3～8 个英文字母';
+    }
+    return null;
+}
+
+/** 角色名：恰好 2～4 个汉字（统一表意文字） */
+function validateRoleName(name: string): string | null {
+    if (!/^[\p{Unified_Ideograph}]{2,4}$/u.test(name)) {
+        return '角色名须为 2～4 个汉字';
+    }
+    return null;
+}
+
+/** 站点卡片必填 Email */
+function validateEmail(email: string): string | null {
+    const t = email.trim();
+    if (!t) return '请填写 Email';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) {
+        return 'Email 格式不正确';
+    }
+    return null;
+}
+
+function validatePasswordFields(password: string, managePassword: string): string | null {
+    if (password.length > 0 && password.length < MIN_PASSWORD_LEN) {
+        return '普通密码至少 6 位，或留空不填';
+    }
+    if (managePassword.length > 0 && managePassword.length < MIN_PASSWORD_LEN) {
+        return '管理密码至少 6 位，或留空不填';
+    }
+    if (password.length > 0 && managePassword.length > 0 && password === managePassword) {
+        return '普通密码与管理密码不能相同';
+    }
+    return null;
+}
+
 // 封装函数处理 card 属性的 trim 操作
 const getTrimData = (card: any) => {
     return {
         title: card.title.trim(),
         ip: card.ip.trim(),
         port: card.port.trim(),
-        account: card.account.trim(),
+        account: card.account.trim().toLowerCase(),
         password: card.password.trim(),
+        managePassword: card.managePassword.trim(),
         name: card.name.trim(),
-        charset: (card.charset as CardModel['charset']) || 'gb18030'
+        email: card.email.trim(),
+        charset: 'gb18030' as const
     };
 };
 
@@ -162,11 +207,21 @@ const getTrimData = (card: any) => {
 const saveEdit = (card: any) => {
     // 更新函数调用
     const trimData = getTrimData(card);
-    if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
+    if (!trimData.title || !trimData.ip || !trimData.port || !trimData.account || !trimData.name || !trimData.email) {
         ElMessage({
-            message: '内容不能为空！',
+            message: '内容不能为空（含 Email）！',
             type: 'error',
             duration: 1000 // 提示持续时间（毫秒）
+        });
+        return;
+    }
+
+    const emailErr = validateEmail(trimData.email);
+    if (emailErr) {
+        ElMessage({
+            message: emailErr,
+            type: 'error',
+            duration: 1500
         });
         return;
     }
@@ -180,6 +235,38 @@ const saveEdit = (card: any) => {
         return;
     }
 
+    const accountErr = validateAccount(trimData.account);
+    if (accountErr) {
+        ElMessage({
+            message: accountErr,
+            type: 'error',
+            duration: 1500
+        });
+        return;
+    }
+
+    const pwdErr = validatePasswordFields(trimData.password, trimData.managePassword);
+    if (pwdErr) {
+        ElMessage({
+            message: pwdErr,
+            type: 'error',
+            duration: 1500
+        });
+        return;
+    }
+
+    const nameErr = validateRoleName(trimData.name);
+    if (nameErr) {
+        ElMessage({
+            message: nameErr,
+            type: 'error',
+            duration: 1500
+        });
+        return;
+    }
+
+    card.account = trimData.account;
+
     card.isEditing = false;
     allowClick.value = !card.isEditing;
     if (isCreated.value) {
@@ -188,7 +275,7 @@ const saveEdit = (card: any) => {
 
     base.sendSiteList({
         type: 'save',
-        content: getTrimData(trimData)
+        content: getTrimData(card)
     });
 };
 
@@ -198,7 +285,7 @@ const cancelEdit = (card: any) => {
     const trimData = getTrimData(card);
 
     if (card.isEditing && trimData.account) {
-        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name) {
+        if (!trimData.title || !trimData.ip || !trimData.port || !trimData.name || !trimData.email) {
             ElMessage({
                 message: '内容不能为空！',
                 type: 'error',
@@ -208,7 +295,7 @@ const cancelEdit = (card: any) => {
         }
     }
 
-    if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name) {
+    if (trimData.title && trimData.ip && trimData.port && trimData.account && trimData.name && trimData.email) {
         if (card.isEditing) {
             // isEditing.value = false;
             card.isEditing = false;
@@ -234,25 +321,29 @@ const allowClicked = (card: any) => {
         return;
     }
 
-    const datas = {
-        title: card.title,
-        ip: card.ip,
-        port: card.port,
-        account: card.account,
-        password: card.password,
-        name: card.name,
-        charset: card.charset ?? 'gb18030'
-    };
+    const datas = getTrimData(card);
+    const emailErr = validateEmail(datas.email);
+    if (emailErr) {
+        ElMessage({
+            message: emailErr,
+            type: 'error',
+            duration: 1500
+        });
+        return;
+    }
+
     emits('cardClicked', true);
 
     // 设置store
     const configStore = useConfigStore();
-    configStore.setConfig(datas);
+    configStore.setCfg(datas);
 
-    // 连接mud服务器
-    base.connect({
-        type: 'telnet',
-        content: datas
+    // 等 Terminal 挂载并注册 to-vue 后再连，否则首包桥接 JSON 可能在监听器注册前到达并被丢弃
+    void nextTick(() => {
+        base.connect({
+            type: 'telnet',
+            content: datas
+        });
     });
 };
 

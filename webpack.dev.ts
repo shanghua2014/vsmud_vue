@@ -1,13 +1,17 @@
-/** @format */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { VueLoaderPlugin } from 'vue-loader';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import webpack from 'webpack';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 
-const path = require('path')
-const { VueLoaderPlugin } = require('vue-loader')
-const HtmlWebpackPlugin = require('html-webpack-plugin')
-const { DefinePlugin } = require('webpack')
-const MiniCssExtractPlugin = require('mini-css-extract-plugin')
+const { DefinePlugin } = webpack;
 
-module.exports = {
-    mode: 'development',
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default {
+    mode: 'development' as const,
     devtool: 'eval-cheap-module-source-map',
     entry: './src/main.ts',
     output: {
@@ -50,12 +54,10 @@ module.exports = {
             },
             {
                 test: /\.css$/,
-                // 开发环境也使用 MiniCssExtractPlugin.loader
                 use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader']
             },
             {
                 test: /\.scss$/,
-                // 开发环境也使用 MiniCssExtractPlugin.loader
                 use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader', 'sass-loader']
             },
             {
@@ -92,4 +94,4 @@ module.exports = {
             '@': path.resolve(__dirname, 'src')
         }
     }
-}
+};
