@@ -6,7 +6,7 @@
     "scripts": {
         "build": "vite build",
         "serve": "vite",
-        "mud-bridge": "tsx ./scripts/ws-telnet-bridge.ts",
+        "mud-bridge": "node -e \"console.log('桥接已迁至仓库 nt7_node，请执行: cd ../nt7_node && npm start')\"",
         "dev": "tsx ./node_modules/webpack/bin/webpack.js --config webpack.dev.ts --mode development"
     },
     "dependencies": {

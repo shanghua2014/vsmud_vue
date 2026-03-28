@@ -9,7 +9,6 @@ export const S1 = {
     Alh: 'alh',
     Wash: 'wash',
     InfT: 'infT',
-    LvV: 'lvV',
     Ky: 'ky',
     CEye: 'cEye',
     LHb: 'lHb',

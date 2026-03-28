@@ -16,8 +16,11 @@
                     @alh="onAlh"
                     @wash="onWash"
                     @infT="onInfT"
-                    @lvV="onLvV"
+                    @baiShi="onBaiShi"
+                    @baiWuBo="onBaiWuBo"
+                    @cfLv="onCfLv"
                     @ky="onKy"
+                    @d14="onD14"
                     @cEye="onCEye"
                     @lHb="onLHb"
                     @pgM="onPgM"
@@ -57,14 +60,20 @@
                     :show-ask-lao-here="showAskLao"
                     :show-wash-to="showWashTo"
                     :show-info-topics="showInfoTopics"
-                    :show-leave-village="showLeaveVillage"
+                    :show-bai-shi="showBaiShi"
+                    :show-bai-wu-bo="showBaiWuBo"
+                    :show-confirm-leave-village="showConfirmLeaveVillage"
                     @characterChoice="onCharacterChoice"
                     @askLaoHereChoice="onAskLaoHereChoice"
                     @washToChoice="onWashToChoice"
                     @infoTopicChoice="onInfoTopicChoice"
-                    @leaveVillageChoice="onLeaveVillageChoice"
+                    @baiShiChoice="onBaiShiChoice"
+                    @baiWuBoChoice="onBaiWuBoChoice"
+                    @confirmLeaveVillageChoice="onConfirmLeaveVillageChoice"
                     :show-kuaiyi-pvp-pve="showKuaiyiPvpPve"
+                    :show-direct-14="showDirect14Menu"
                     @kuaiyiPvpPveChoice="onKuaiyiPvpPveChoice"
+                    @direct14Choice="onDirect14Choice"
                     :show-close-eye="showCloseEye"
                     @closeEyeChoice="onCloseEyeChoice"
                     :show-ask-lao-huabo="showAskLaoHuabo"
@@ -116,13 +125,21 @@ import { storeToRefs } from 'pinia';
 import { useConfigStore } from './stores/store';
 import {
     ALH_CMD,
-    LV_CMD,
+    BAISHI_CMD,
+    BAIWUBO_CMD,
     CE_CMD,
     HB_CMD,
+    LV_CONFIRM_CMD,
     WASH_CMD,
     infTopicCmd
 } from './common/mudDownlinkPrompts';
 import { createS1, S1 } from './common/sessionOneShotPrompts';
+import {
+    createHiddenUntilRematchState,
+    onHiddenUntilRematchSignal,
+    markHiddenUntilRematchClicked,
+    resetHiddenUntilRematchState
+} from './common/promptReopenState';
 
 const { cfg } = storeToRefs(useConfigStore());
 /** 桥接 [1;32m姓氏：由当前站点卡片角色名拆成按钮 */
@@ -164,12 +181,24 @@ const askLaoSrv = ref(false);
 const washToSrv = ref(false);
 /** 终端下行「要了解的信息」提示 */
 const infTSrv = ref(false);
-const leaveSrv = ref(false);
+const baiShiSrv = ref(false);
+/** 点「拜师」后隐藏；再次匹配成功（false->true）后恢复 */
+const baiShiReopen = createHiddenUntilRematchState();
+const baiWuBoSrv = ref(false);
+const baiWuBoReopen = createHiddenUntilRematchState();
 const kuaiyiSrv = ref(false);
+/** 下行 `[1;36m1. 直接`：菜单数字 1～4 */
+const d14Srv = ref(false);
+/** 点 1～4 后隐藏；再次匹配成功（false->true）后恢复显示 */
+const d14Reopen = createHiddenUntilRematchState();
 const closeEyeSrv = ref(false);
 const huaboSrv = ref(false);
 /** 终端下行 [37m== 未完：菜单栏「下一页」「结束」 */
 const pageMoreSrv = ref(false);
+/** 下行 `[1;31mask hua` 等：「确认出村」 */
+const cfLvSrv = ref(false);
+/** 点「确认出村」后隐藏；再次匹配成功（false->true）后恢复显示 */
+const cfLvReopen = createHiddenUntilRematchState();
 const s1 = createS1();
 
 /** 重连用（与 Terminal/MudList 同一模块级 WebSocket） */
@@ -258,17 +287,42 @@ const showAskLaoHuabo = computed(
         !showCloseEye.value
 );
 
-/** washto 指令格式提示：确定按钮；性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
-const showWashTo = computed(
+/** 下行 ask hua（`cfLv`）：确认出村；点击后暂隐，再次匹配后恢复 */
+const showConfirmLeaveVillage = computed(
     () =>
-        s1.shouldShow(S1.Wash, washToSrv.value) &&
+        cfLvSrv.value &&
+        !cfLvReopen.hiddenAfterClick.value &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
         !showAskLaoHuabo.value
 );
 
-/** 菜单区「老对长」：下行匹配 ask lao 提示且本会话未点过；性格/washto/PVP·PVE/闭眼/找花伯 条出现时让位 */
+/** `[1;36m1. 直接`：四钮发 1～4；点击后暂隐，再次匹配后恢复（快意/闭眼/花伯/确认出村 仍优先） */
+const showDirect14Menu = computed(
+    () =>
+        d14Srv.value &&
+        !d14Reopen.hiddenAfterClick.value &&
+        !showChooseChar.value &&
+        !showKuaiyiPvpPve.value &&
+        !showCloseEye.value &&
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value
+);
+
+/** washto 指令格式提示：确定按钮；性格/PVP·PVE/闭眼/找花伯/确认出村 条出现时让位 */
+const showWashTo = computed(
+    () =>
+        s1.shouldShow(S1.Wash, washToSrv.value) &&
+        !showChooseChar.value &&
+        !showKuaiyiPvpPve.value &&
+        !showCloseEye.value &&
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
+);
+
+/** 菜单区「老对长」：下行匹配 ask lao 提示且本会话未点过；性格/washto/PVP·PVE/闭眼/找花伯/确认出村 条出现时让位 */
 const showAskLao = computed(
     () =>
         s1.shouldShow(S1.Alh, askLaoSrv.value) &&
@@ -276,32 +330,52 @@ const showAskLao = computed(
         !showWashTo.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
-        !showAskLaoHuabo.value
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
 );
 
-/** 「信息」：下行 `infT` 且本会话未 suppress；性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
+/** 「信息」：下行 `infT` 且本会话未 suppress；不因点数字隐藏（仅「信息」展开/收起在 Menu 内） */
 const showInfoTopics = computed(
     () =>
         s1.shouldShow(S1.InfT, infTSrv.value) &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
-        !showAskLaoHuabo.value
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
 );
 
-/** 老玩家出村：性格/PVP·PVE/闭眼/找花伯 条出现时让位 */
-const showLeaveVillage = computed(
+/** 「拜师」：与「信息」相同互斥；下行 + rematch（本会话非 S1） */
+const showBaiShi = computed(
     () =>
-        s1.shouldShow(S1.LvV, leaveSrv.value) &&
+        baiShiSrv.value &&
+        !baiShiReopen.hiddenAfterClick.value &&
         !showChooseChar.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
-        !showAskLaoHuabo.value
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
+);
+
+/** 「拜武伯」：与拜师同类 rematch */
+const showBaiWuBo = computed(
+    () =>
+        baiWuBoSrv.value &&
+        !baiWuBoReopen.hiddenAfterClick.value &&
+        !showChooseChar.value &&
+        !showKuaiyiPvpPve.value &&
+        !showCloseEye.value &&
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
 );
 
 /** 菜单栏「下一页」：性格四选一时让位 */
 const showPageMore = computed(
-    () => pageMoreSrv.value && !showChooseChar.value
+    () => pageMoreSrv.value && !showChooseChar.value && !showDirect14Menu.value
 );
 
 /** 菜单区 Email：服务端有提示且本会话未点过、其它菜单条显示时让位 */
@@ -313,10 +387,13 @@ const showEmailMenu = computed(() => {
         !showAskLao.value &&
         !showWashTo.value &&
         !showInfoTopics.value &&
-        !showLeaveVillage.value &&
+        !showBaiShi.value &&
+        !showBaiWuBo.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
-        !showAskLaoHuabo.value
+        !showAskLaoHuabo.value &&
+        !showConfirmLeaveVillage.value &&
+        !showDirect14Menu.value
     );
 });
 const terminalRef = ref<{
@@ -331,8 +408,11 @@ const terminalRef = ref<{
     sendAlhChoice?: (cmd: string) => void;
     sendWashChoice?: (cmd: string) => void;
     sendInfTopicChoice?: (cmd: string) => void;
-    sendLvChoice?: (cmd: string) => void;
+    sendBaiShiChoice?: (cmd: string) => void;
+    sendBaiWuBoChoice?: (cmd: string) => void;
+    sendCfLvChoice?: (cmd: string) => void;
     sendKyChoice?: (cmd: string) => void;
+    sendDirect14?: (digit: string) => void;
     sendCeChoice?: (cmd: string) => void;
     sendHbChoice?: (cmd: string) => void;
     sendPgEnter?: () => void;
@@ -345,7 +425,11 @@ const terminalRef = ref<{
 
 /** 「找花伯」按钮出现后 10 秒内点击不发命令，仅终端提示；按钮上显示剩余秒数 */
 const LAOHUABO_COOLDOWN_MS = 10_000;
+/** 倒计时显示结束后，再静默 1 秒才允许发命令（无终端提示） */
+const LAOHUABO_SILENT_AFTER_MS = 1000;
 const laoHuaboCooldownUntil = ref(0);
+/** 早于此时戳的点击一律不发命令（含可见倒计时 + 静默 1 秒） */
+const laoHuaboEffectiveUntil = ref(0);
 const laoHuaboCooldownSec = ref(0);
 let laoHuaboTick: ReturnType<typeof setInterval> | null = null;
 
@@ -370,11 +454,14 @@ function updateLaoHuaboSec() {
 watch(showAskLaoHuabo, (show) => {
     clearLaoHuaboTick();
     if (show) {
-        laoHuaboCooldownUntil.value = Date.now() + LAOHUABO_COOLDOWN_MS;
+        const t0 = Date.now();
+        laoHuaboCooldownUntil.value = t0 + LAOHUABO_COOLDOWN_MS;
+        laoHuaboEffectiveUntil.value = t0 + LAOHUABO_COOLDOWN_MS + LAOHUABO_SILENT_AFTER_MS;
         updateLaoHuaboSec();
         laoHuaboTick = setInterval(updateLaoHuaboSec, 250);
     } else {
         laoHuaboCooldownUntil.value = 0;
+        laoHuaboEffectiveUntil.value = 0;
         laoHuaboCooldownSec.value = 0;
     }
 });
@@ -393,13 +480,14 @@ const receive = {
     }
 };
 
-/** 文档菜单「退出」：先发 quit，下行匹配放弃账号则静默发 y，再清屏；超时也会清屏 */
+/** 文档菜单「退出」：先发 quit，下行匹配放弃账号则静默发 y；结束后整页刷新 */
 const onClearTerminal = () => {
     terminalRef.value?.startQuitAndReturnList?.();
 };
 
+/** quit 流程结束（含超时）：整页刷新，不再回到站点列表 */
 const onQuitListComplete = () => {
-    showLayout.value = false;
+    window.location.reload();
 };
 
 /** 站点卡片 Email 校验（与 MudList 一致） */
@@ -426,9 +514,11 @@ const onReconnectMud = () => {
     }
     terminalRef.value?.mudDisconnect?.();
     void nextTick(() => {
-        mudBase.connect({
-            type: 'telnet',
-            content: c as SiteCard
+        void nextTick(() => {
+            mudBase.connect({
+                type: 'telnet',
+                content: c as SiteCard
+            });
         });
     });
 };
@@ -500,14 +590,33 @@ const onInfT = (v: boolean) => {
     if (v) s1.suppress(S1.Em);
 };
 
-const onLvV = (v: boolean) => {
-    leaveSrv.value = v;
+const onBaiShi = (v: boolean) => {
+    baiShiSrv.value = v;
     if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(baiShiReopen, v);
+};
+
+const onBaiWuBo = (v: boolean) => {
+    baiWuBoSrv.value = v;
+    if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(baiWuBoReopen, v);
+};
+
+const onCfLv = (v: boolean) => {
+    cfLvSrv.value = v;
+    if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(cfLvReopen, v);
 };
 
 const onKy = (v: boolean) => {
     kuaiyiSrv.value = v;
     if (v) s1.suppress(S1.Em);
+};
+
+const onD14 = (v: boolean) => {
+    d14Srv.value = v;
+    if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(d14Reopen, v);
 };
 
 const onCEye = (v: boolean) => {
@@ -535,6 +644,15 @@ const onPageEndChoice = () => {
 
 const onMudSess = () => {
     s1.resetSession();
+    infTSrv.value = false;
+    baiShiSrv.value = false;
+    resetHiddenUntilRematchState(baiShiReopen);
+    baiWuBoSrv.value = false;
+    resetHiddenUntilRematchState(baiWuBoReopen);
+    cfLvSrv.value = false;
+    resetHiddenUntilRematchState(cfLvReopen);
+    d14Srv.value = false;
+    resetHiddenUntilRematchState(d14Reopen);
     xingShiSrv.value = false;
     mingZiSrv.value = false;
     quanMingSrv.value = false;
@@ -600,14 +718,29 @@ const onInfoTopicChoice = (index: number) => {
     terminalRef.value?.sendInfTopicChoice?.(infTopicCmd(index));
 };
 
-const onLeaveVillageChoice = () => {
-    terminalRef.value?.sendLvChoice?.(LV_CMD);
-    s1.suppress(S1.LvV);
+const onBaiShiChoice = () => {
+    terminalRef.value?.sendBaiShiChoice?.(BAISHI_CMD);
+    markHiddenUntilRematchClicked(baiShiReopen, baiShiSrv.value);
+};
+
+const onBaiWuBoChoice = () => {
+    terminalRef.value?.sendBaiWuBoChoice?.(BAIWUBO_CMD);
+    markHiddenUntilRematchClicked(baiWuBoReopen, baiWuBoSrv.value);
+};
+
+const onConfirmLeaveVillageChoice = () => {
+    terminalRef.value?.sendCfLvChoice?.(LV_CONFIRM_CMD);
+    markHiddenUntilRematchClicked(cfLvReopen, cfLvSrv.value);
 };
 
 const onKuaiyiPvpPveChoice = (cmd: string) => {
     terminalRef.value?.sendKyChoice?.(cmd);
     s1.suppress(S1.Ky);
+};
+
+const onDirect14Choice = (digit: string) => {
+    terminalRef.value?.sendDirect14?.(digit);
+    markHiddenUntilRematchClicked(d14Reopen, d14Srv.value);
 };
 
 const onCloseEyeChoice = () => {
@@ -616,8 +749,11 @@ const onCloseEyeChoice = () => {
 };
 
 const onLaoHuaboChoice = () => {
-    if (Date.now() < laoHuaboCooldownUntil.value) {
-        terminalRef.value?.printLocalLine?.('稍等系统喘息中。。。');
+    const now = Date.now();
+    if (now < laoHuaboEffectiveUntil.value) {
+        if (now < laoHuaboCooldownUntil.value) {
+            terminalRef.value?.printLocalLine?.('稍等系统喘息中。。。');
+        }
         return;
     }
     terminalRef.value?.sendHbChoice?.(HB_CMD);

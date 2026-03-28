@@ -338,11 +338,13 @@ const allowClicked = (card: any) => {
     const configStore = useConfigStore();
     configStore.setCfg(datas);
 
-    // 等 Terminal 挂载并注册 to-vue 后再连，否则首包桥接 JSON 可能在监听器注册前到达并被丢弃
+    // 等 Terminal 挂载并注册 to-vue 后再连（双重 nextTick 确保子组件 onMounted 已执行）
     void nextTick(() => {
-        base.connect({
-            type: 'telnet',
-            content: datas
+        void nextTick(() => {
+            base.connect({
+                type: 'telnet',
+                content: datas
+            });
         });
     });
 };

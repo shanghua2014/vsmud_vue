@@ -1,4 +1,11 @@
-import { decodeMudPayload, encodeMudLine, normalizeMudCharset, type MudCharset } from './mudEncoding';
+import {
+    decodeMudPayload,
+    decodeMudTextFromBase64,
+    encodeMudLine,
+    mudCharsetFromControlField,
+    normalizeMudCharset,
+    type MudCharset
+} from './mudEncoding';
 
 export interface Message {
     type: string;
@@ -119,12 +126,21 @@ export interface BrPr {
     alh: boolean;
     wash: boolean;
     infT: boolean;
-    lvV: boolean;
+    /** 拜师：与「信息」同套显示条件 */
+    baiShi: boolean;
+    /** 拜武伯：与拜师同类 rematch */
+    baiWuBo: boolean;
+    /** `[1;31mask hua` 等：确认出村 */
+    cfLv: boolean;
     ky: boolean;
+    /** `[1;36m1. 直接`：菜单 1～4 */
+    d14: boolean;
     cEye: boolean;
     lHb: boolean;
     cxPwd: boolean;
     pgM: boolean;
+    /** quit 流程：下行匹配「放弃账号」确认行（仅桥接 snapBr 计算） */
+    quitAbd?: boolean;
     rcD: boolean;
     xsP: boolean;
     mzP: boolean;
@@ -172,6 +188,9 @@ export type MudVue =
           prompts: BrPr;
           exits?: BrEx;
           roomTitle?: BrRt;
+          /** 网关：Base64 原始段 + mudTextEnc；旧版可无编码（明文） */
+          mudText?: string;
+          mudTextEnc?: 'base64';
       };
 
 type MudEventName = 'telnet-connected' | 'telnet-error' | 'to-vue' | 'telnet-disconnected';
@@ -272,14 +291,20 @@ export class Base {
         const wsPath = site?.wsPath?.trim() || '/';
         const fullWsUrl = Boolean(host && /^wss?:\/\//i.test(host));
         if (!fullWsUrl && (!host || !port)) {
-            emitEv('telnet-error', '????????????');
+            emitEv('telnet-error', '请填写站点地址与端口');
             return;
         }
         mudCs = normalizeMudCharset(site?.charset);
         if (ws && ws.readyState <= WebSocket.OPEN) {
             ws.close();
         }
-        const wsUrl = fullWsUrl ? host! : mkWsUrl(host!, port!, wsPath);
+        const gatewayRaw = import.meta.env.VITE_MUD_GATEWAY?.trim();
+        const useGateway = Boolean(gatewayRaw) && !fullWsUrl;
+        const wsUrl = useGateway
+            ? gatewayRaw!
+            : fullWsUrl
+              ? host!
+              : mkWsUrl(host!, port!, wsPath);
         let opened = false;
         let socket: WebSocket;
         try {
@@ -287,12 +312,27 @@ export class Base {
             socket.binaryType = 'arraybuffer';
             ws = socket;
         } catch (err) {
-            emitEv('telnet-error', `?? WebSocket ??: ${String(err)}`);
+            emitEv('telnet-error', `创建 WebSocket 失败：${String(err)}`);
             return;
         }
         socket.onopen = () => {
-            opened = true;
-            emitEv('telnet-connected', undefined);
+            if (useGateway) {
+                socket.send(
+                    JSON.stringify({
+                        v: 1,
+                        channel: 'vsmud-session',
+                        connect: {
+                            ip: host,
+                            port,
+                            charset: mudCs,
+                            wsPath
+                        }
+                    })
+                );
+            } else {
+                opened = true;
+                emitEv('telnet-connected', undefined);
+            }
         };
         socket.onerror = () => {
             console.warn('[vsmud] WebSocket error:', wsUrl);
@@ -305,11 +345,13 @@ export class Base {
             }
             const hint =
                 ev.code === 1006
-                    ? '??????????? WebSocket ?????? Telnet/TCP???? npm run mud-bridge ????'
+                    ? useGateway
+                        ? ' 网关模式请确认已启动 nt7_node（npm start），且 VITE_MUD_GATEWAY 可访问。'
+                        : ' 直连模式请确认游戏侧已开启可被浏览器访问的 WebSocket/Telnet 桥接。'
                     : '';
             emitEv(
                 'telnet-error',
-                `???? WebSocket: ${wsUrl}  code=${ev.code}${ev.reason ? ` ${ev.reason}` : ''}${hint}`
+                `无法连接 WebSocket：${wsUrl}（code=${ev.code}${ev.reason ? ` ${ev.reason}` : ''}）${hint}`
             );
         };
         socket.onmessage = async (event) => {
@@ -319,19 +361,58 @@ export class Base {
                     const parsed = JSON.parse(payload) as {
                         v?: number;
                         channel?: string;
+                        ready?: boolean;
+                        error?: string;
                         prompts?: BrPr;
                         exits?: BrEx;
                         roomTitle?: BrRt;
+                        charset?: string;
+                        mudText?: string;
+                        mudTextEnc?: 'base64';
                     };
+                    if (parsed?.v === 1 && parsed?.channel === 'vsmud-session') {
+                        if (parsed.ready === true) {
+                            if (!opened) {
+                                opened = true;
+                                emitEv('telnet-connected', undefined);
+                            }
+                            return;
+                        }
+                        if (typeof parsed.error === 'string') {
+                            emitEv('telnet-error', parsed.error);
+                            socket.close();
+                            return;
+                        }
+                    }
                     if (
                         parsed?.v === 1 &&
                         parsed?.channel === 'vsmud-control' &&
                         parsed.prompts &&
                         typeof parsed.prompts === 'object'
                     ) {
+                        const ctlCs = mudCharsetFromControlField(parsed.charset);
+                        const mt = typeof parsed.mudText === 'string' ? parsed.mudText : '';
+                        let display = '';
+                        if (mt.length > 0) {
+                            if (parsed.mudTextEnc === 'base64') {
+                                try {
+                                    display = await decodeMudTextFromBase64(mt, ctlCs);
+                                } catch (e) {
+                                    console.warn('[vsmud] mudText Base64 解码失败', e);
+                                }
+                            } else {
+                                display = mt;
+                            }
+                            if (display.length > 0) {
+                                emitEv('to-vue', { type: 'mud', content: display });
+                            }
+                        }
                         emitEv('to-vue', {
                             type: 'bridge-control',
                             prompts: parsed.prompts as BrPr,
+                            ...(typeof parsed.mudText === 'string'
+                                ? { mudText: parsed.mudText, mudTextEnc: parsed.mudTextEnc }
+                                : {}),
                             ...(parsed.exits && typeof parsed.exits === 'object'
                                 ? { exits: parsed.exits as BrEx }
                                 : {}),
@@ -341,15 +422,20 @@ export class Base {
                         });
                     }
                 } catch {
-                    /* 非 JSON 文本忽略 */
+                    /** 非 JSON 文本帧：直连桥若用 UTF-8 文本转发 Telnet，须当正文显示 */
+                    emitEv('to-vue', { type: 'mud', content: payload });
                 }
                 return;
             }
-            const content = await decodeMudPayload(
-                payload as ArrayBuffer | Blob,
-                mudCs
-            );
-            emitEv('to-vue', { type: 'mud', content });
+            try {
+                const content = await decodeMudPayload(
+                    payload as ArrayBuffer | Blob,
+                    mudCs
+                );
+                emitEv('to-vue', { type: 'mud', content });
+            } catch (e) {
+                console.warn('[vsmud] decode MUD binary failed:', e);
+            }
         };
     }
 

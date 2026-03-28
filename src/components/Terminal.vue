@@ -56,13 +56,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
 import { Base, xTermLoginc } from '@/common/common';
-import {
-    applyMudExitDirsFromBuffer,
-    resetMudExitDirs,
-    isExitButtonVisible,
-    mudExitKeys
-} from '@/common/mudExitDirs';
-import { snapBr, mPg, QUIT_ABANDON_PAT } from '@/common/mudBridgeDownlinkCore';
+import { resetMudExitDirs, isExitButtonVisible, mudExitKeys } from '@/common/mudExitDirs';
 import { useConfigStore } from '@/stores/store';
 import type { MudVue, BrPr, BrEx, BrRt } from '@/common/common';
 
@@ -155,8 +149,11 @@ const emits = defineEmits([
     'alh',
     'wash',
     'infT',
-    'lvV',
+    'baiShi',
+    'baiWuBo',
+    'cfLv',
     'ky',
+    'd14',
     'cEye',
     'lHb',
     'cxPwd',
@@ -179,7 +176,7 @@ const cfgStore = useConfigStore();
 const quitListPending = ref(false);
 let quitListTimer: ReturnType<typeof setTimeout> | null = null;
 /** 发 quit 后未匹配到放弃账号提示则超时清屏（毫秒） */
-const QUIT_LIST_TIMEOUT_MS = 500;
+const QUIT_LIST_TIMEOUT_MS = 1000;
 
 /** 连接建立 / 断开时收起所有菜单提示；`includeEmail: false` 用于菜单快捷发送后（保留邮箱提示状态） */
 function emitPrFalse(options: { includeEmail?: boolean } = {}) {
@@ -191,8 +188,11 @@ function emitPrFalse(options: { includeEmail?: boolean } = {}) {
     emits('alh', false);
     emits('wash', false);
     emits('infT', false);
-    emits('lvV', false);
+    emits('baiShi', false);
+    emits('baiWuBo', false);
+    emits('cfLv', false);
     emits('ky', false);
+    emits('d14', false);
     emits('cEye', false);
     emits('lHb', false);
     emits('cxPwd', false);
@@ -219,9 +219,6 @@ const serverRawBuffer = ref('');
 const pageMoreHidden = ref(false);
 /** 本会话内已对「重新连线完毕」自动发过 look，避免缓冲区内重复命中 */
 const reconnectLookSent = ref(false);
-/** 已收到桥接层 vsmud-control JSON，菜单提示以桥接快照为准，不再用本机正则重复发 emit */
-const bridgeCtl = ref(false);
-
 let removeScrollListener: () => void;
 let onConnected: (() => void) | null = null;
 let onError: ((msg: string) => void) | null = null;
@@ -274,7 +271,6 @@ onMounted(() => {
         autoAccountSent.value = false;
         autoPasswordSent.value = false;
         reconnectLookSent.value = false;
-        bridgeCtl.value = false;
         emits('mudSess');
     };
     onError = (msg: string) => {
@@ -310,6 +306,13 @@ onMounted(() => {
     };
 
     const applyBrCtl = (p: BrPr, ex?: BrEx | null, rt?: BrRt | null) => {
+        if (quitListPending.value && p.quitAbd) {
+            clearQuitListTimer();
+            base.sendMessage('y');
+            finishQuitToList();
+            return;
+        }
+
         emits('yn', p.yn);
         emits('mf', p.mf);
         emits('em', p.em);
@@ -320,8 +323,11 @@ onMounted(() => {
         emits('alh', p.alh);
         emits('wash', p.wash);
         emits('infT', p.infT);
-        emits('lvV', p.lvV);
+        emits('baiShi', Boolean(p.baiShi));
+        emits('baiWuBo', Boolean(p.baiWuBo));
+        emits('cfLv', Boolean(p.cfLv));
         emits('ky', p.ky);
+        emits('d14', Boolean(p.d14));
         emits('cEye', p.cEye);
         emits('lHb', p.lHb);
         emits('cxPwd', p.cxPwd);
@@ -343,44 +349,19 @@ onMounted(() => {
             lookBtnLabel.value = rt.nm ?? 'Look';
         }
         updQaFromPr(p);
-    };
 
-    onData = (data: MudVue) => {
-        if (data.type === 'bridge-control') {
-            bridgeCtl.value = true;
-            maybeRcLook(data.prompts);
-            applyBrCtl(data.prompts, data.exits, data.roomTitle);
-            return;
-        }
-        if (data.type !== 'mud') return;
-        if (terminal.value) {
-            logic.termWrite(terminal, data);
-        }
-        const raw = data.content ?? '';
-        serverRawBuffer.value = `${serverRawBuffer.value}${raw}`.slice(-4096);
-        const buf = serverRawBuffer.value;
-
-        if (quitListPending.value && QUIT_ABANDON_PAT.test(buf)) {
-            clearQuitListTimer();
-            base.sendMessage('y');
-            finishQuitToList();
-            return;
+        /** 分页「结束」后隐藏；仅依据桥接快照的 pgM */
+        if (pageMoreHidden.value && !p.pgM) {
+            pageMoreHidden.value = false;
         }
 
-        const snap = snapBr(raw, buf);
-
-        if (!bridgeCtl.value) {
-            applyMudExitDirsFromBuffer(buf);
-        }
-
-        maybeRcLook(snap);
-
+        /** 站点卡片账号/密码自动上行：仅用桥接 prompts，不在前端扫缓冲 */
         const accountTrim = cfgStore.cfg?.account?.trim();
         const pwdTrim = cfgStore.cfg?.password?.trim();
-        const skipCredAuto = snap.yn || snap.mf;
+        const skipCredAuto = p.yn || p.mf;
         if (!skipCredAuto && terminal.value) {
             if (pwdTrim && !autoPasswordSent.value) {
-                const pwdMatch = (snap.lgPwdL ?? false) || snap.cxPwd;
+                const pwdMatch = (p.lgPwdL ?? false) || p.cxPwd;
                 if (pwdMatch) {
                     autoPasswordSent.value = true;
                     base.sendMessage(pwdTrim);
@@ -388,24 +369,26 @@ onMounted(() => {
                 }
             }
             if (accountTrim && !autoAccountSent.value) {
-                if (snap.enNmL) {
+                if (p.enNmL) {
                     autoAccountSent.value = true;
                     base.sendMessage(accountTrim);
                     sendCommand(accountTrim, terminal, 'client');
                 }
             }
         }
+    };
 
-        const pageMoreMatched = snap.pgM;
-        const pageMorePromptInThisChunk = raw.length > 0 && mPg(raw);
-        if (pageMoreHidden.value) {
-            if (!pageMoreMatched || pageMorePromptInThisChunk) {
-                pageMoreHidden.value = false;
-            }
+    onData = (data: MudVue) => {
+        if (data.type === 'bridge-control') {
+            /** 正文由 common 对 vsmud-control 先 emit 的 `mud` 帧写入，与直连 binary 路径一致 */
+            maybeRcLook(data.prompts);
+            applyBrCtl(data.prompts, data.exits, data.roomTitle);
+            return;
         }
-
-        if (!bridgeCtl.value) {
-            applyBrCtl(snap, undefined, undefined);
+        /** 纯展示：菜单与方向区仅由前一条 WebSocket 文本帧 `vsmud-control` 更新（须走 mud-bridge） */
+        if (data.type !== 'mud') return;
+        if (terminal.value) {
+            logic.termWrite(terminal, data);
         }
     };
     onDisconnected = () => {
@@ -416,7 +399,6 @@ onMounted(() => {
         ElMessage.info('MUD 连接已断开');
         resetMudExitDirs();
         pageMoreHidden.value = false;
-        bridgeCtl.value = false;
         lookBtnLabel.value = 'Look';
         quickActions.value = [];
         emitPrFalse();
@@ -654,15 +636,45 @@ const sendInfTopicChoice = (command: string) => {
     handlefocus();
 };
 
-const sendLvChoice = (command: string) => {
+/** `BAISHI_CMD` / `BAIWUBO_CMD`：`;` 串联多句，按序各发一行 */
+const sendSemicolonChainChoice = (command: string, emitDone: () => void) => {
+    if (!terminal.value) return;
+    const parts = splitSemicolonCommands(command);
+    if (!parts.length) return;
+    for (const part of parts) {
+        base.sendMessage(part);
+        sendCommand(part, terminal, 'client');
+    }
+    quickActions.value = [];
+    emitDone();
+};
+
+const sendBaiShiChoice = (command: string) => {
+    sendSemicolonChainChoice(command, () => emits('baiShi', false));
+};
+
+const sendBaiWuBoChoice = (command: string) => {
+    sendSemicolonChainChoice(command, () => emits('baiWuBo', false));
+};
+
+const sendCfLvChoice = (command: string) => {
     runQuickAction(command);
-    emits('lvV', false);
+    emits('cfLv', false);
 };
 
 const sendKyChoice = (command: string) => {
     runQuickAction(command);
     inputBox.value = '';
     emits('ky', false);
+};
+
+/** `[1;36m1. 直接`：菜单发单字 1～4 */
+const sendDirect14 = (digit: string) => {
+    const d = digit.trim();
+    if (!/^[1-4]$/.test(d)) return;
+    runQuickAction(d);
+    inputBox.value = '';
+    emits('d14', false);
 };
 
 const sendCeChoice = (command: string) => {
@@ -687,7 +699,7 @@ function clearQuitListTimer() {
     }
 }
 
-/** 文档菜单退出流程收尾：清屏并发 quitListComplete（父组件返回站点列表） */
+/** 文档菜单退出流程收尾：清屏并发 quitListComplete（父组件整页刷新） */
 function finishQuitToList() {
     if (!quitListPending.value) return;
     quitListPending.value = false;
@@ -737,8 +749,11 @@ defineExpose({
     sendAlhChoice,
     sendWashChoice,
     sendInfTopicChoice,
-    sendLvChoice,
+    sendBaiShiChoice,
+    sendBaiWuBoChoice,
+    sendCfLvChoice,
     sendKyChoice,
+    sendDirect14,
     sendCeChoice,
     sendHbChoice,
     sendPgEnter,

@@ -21,6 +21,24 @@ export async function decodeMudPayload(
     return iconv.decode(Buffer.from(u8), 'gb18030');
 }
 
+/** vsmud-control 里 `charset` 字段 → 与上行一致的 MudCharset */
+export function mudCharsetFromControlField(c: unknown): MudCharset {
+    if (c === 'utf8' || c === 'utf-8') return 'utf8';
+    return 'gb18030';
+}
+
+/**
+ * nt7_node 对 `mudText` 传 Base64（本段 TCP 原始字节）；用本帧 `charset` 解码为终端字符串。
+ */
+export async function decodeMudTextFromBase64(b64: string, charset: MudCharset): Promise<string> {
+    const t = b64.replace(/\s/g, '');
+    if (!t) return '';
+    const bin = atob(t);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 0xff;
+    return decodeMudPayload(u8.buffer, charset);
+}
+
 export function encodeMudLine(text: string, charset: MudCharset): Uint8Array {
     if (charset === 'utf8') {
         return new TextEncoder().encode(text);

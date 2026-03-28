@@ -1,7 +1,4 @@
 import { ref } from 'vue';
-import { parseExitDirsFromMudBuffer } from '../../scripts/mud-exit-dirs-parse';
-
-export { parseExitDirsFromMudBuffer };
 
 /** 与房间 exits 键、go.c default_dirs 一致（小写）；供 isUserMoveCommandInput 等使用 */
 const KNOWN_EXIT_KEYS = new Set([
@@ -74,12 +71,6 @@ export function shouldShowExitDirPanel(): boolean {
 
 export function resetMudExitDirs() {
     invalidateMudExitDirs();
-}
-
-export function applyMudExitDirsFromBuffer(buf: string) {
-    const parsed = parseExitDirsFromMudBuffer(buf);
-    if (parsed === null) return;
-    mudExitKeys.value = parsed;
 }
 
 /** 按钮 cmd（与 Channel 发送串一致）→ 对应服务端出口键（任一命中即可显示） */

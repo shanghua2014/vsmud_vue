@@ -5,11 +5,14 @@
             showMfPrompt ||
             showChooseCharacter ||
             showKuaiyiPvpPve ||
+            showDirect14 ||
             showCloseEye ||
             showAskLaoHuabo ||
             showWashTo ||
             showInfoTopics ||
-            showLeaveVillage ||
+            showBaiShi ||
+            showBaiWuBo ||
+            showConfirmLeaveVillage ||
             showAskLaoHere ||
             showEmailPrompt ||
             showPageMore ||
@@ -95,8 +98,20 @@
                 江湖隐士-PVE
             </el-button>
         </template>
+        <template v-if="showDirect14 && !showChooseCharacter">
+            <el-button
+                v-for="d in direct14Digits"
+                :key="`d14-${d}`"
+                size="small"
+                type="primary"
+                plain
+                @click="pickDirect14(d)"
+            >
+                {{ d }}
+            </el-button>
+        </template>
         <el-button
-            v-if="showCloseEye && !showChooseCharacter && !showKuaiyiPvpPve"
+            v-if="showCloseEye && !showChooseCharacter && !showKuaiyiPvpPve && !showDirect14"
             size="small"
             type="primary"
             plain
@@ -107,37 +122,62 @@
         <el-button v-if="showAskLaoHuabo" size="small" type="primary" plain @click="pickLaoHuabo">
             {{ laoHuaboCooldownSec > 0 ? `找花伯 ${laoHuaboCooldownSec}s` : '找花伯' }}
         </el-button>
-        <div v-if="showInfoTopics && !showChooseCharacter" class="mud-info-topics-block">
-            <div v-if="infoTopicsExpanded" class="mud-info-topic-float">
-                <div class="mud-info-topic-grid">
-                    <el-button
-                        v-for="n in infoTopicNumbers"
-                        :key="n"
-                        size="small"
-                        type="primary"
-                        plain
-                        class="mud-info-topic-num"
-                        @click="pickInfoTopic(n)"
-                    >
-                        {{ n }}
-                    </el-button>
+        <div
+            v-if="(showInfoTopics || showBaiShi || showBaiWuBo) && !showChooseCharacter"
+            class="mud-info-bai-shi-row"
+        >
+            <div v-if="showInfoTopics" class="mud-info-topics-block">
+                <div v-if="infoTopicsExpanded" class="mud-info-topic-float">
+                    <div class="mud-info-topic-grid">
+                        <el-button
+                            v-for="n in infoTopicNumbers"
+                            :key="n"
+                            size="small"
+                            type="primary"
+                            plain
+                            class="mud-info-topic-num"
+                            @click="pickInfoTopic(n)"
+                        >
+                            {{ n }}
+                        </el-button>
+                    </div>
                 </div>
+                <el-button size="small" type="primary" plain class="mud-info-toggle-btn" @click="toggleInfoTopicsNumbers">
+                    信息
+                </el-button>
             </div>
-            <el-button size="small" type="primary" plain class="mud-info-toggle-btn" @click="toggleInfoTopicsNumbers">
-                信息
+            <el-button
+                v-if="showBaiShi"
+                size="small"
+                type="primary"
+                plain
+                class="mud-bai-shi-btn"
+                @click="pickBaiShi"
+            >
+                拜师
+            </el-button>
+            <el-button
+                v-if="showBaiWuBo"
+                size="small"
+                type="primary"
+                plain
+                class="mud-bai-shi-btn"
+                @click="pickBaiWuBo"
+            >
+                拜武伯
             </el-button>
         </div>
         <el-button
-            v-if="showLeaveVillage && !showChooseCharacter"
+            v-if="showConfirmLeaveVillage && !showChooseCharacter"
             size="small"
             type="primary"
             plain
-            @click="pickLeaveVillage"
+            @click="pickConfirmLeaveVillage"
         >
-            出村
+            确认出村
         </el-button>
         <el-button
-            v-if="showWashTo && !showChooseCharacter && !showKuaiyiPvpPve && !showCloseEye && !showAskLaoHuabo"
+            v-if="showWashTo && !showChooseCharacter && !showKuaiyiPvpPve && !showCloseEye && !showAskLaoHuabo && !showConfirmLeaveVillage"
             size="small"
             type="primary"
             @click="pickWashTo"
@@ -145,7 +185,7 @@
             确定
         </el-button>
         <el-button
-            v-if="showAskLaoHere && !showChooseCharacter && !showWashTo && !showKuaiyiPvpPve && !showCloseEye && !showAskLaoHuabo"
+            v-if="showAskLaoHere && !showChooseCharacter && !showWashTo && !showKuaiyiPvpPve && !showCloseEye && !showAskLaoHuabo && !showConfirmLeaveVillage"
             size="small"
             type="primary"
             plain
@@ -260,10 +300,16 @@ const props = withDefaults(
     showWashTo?: boolean;
     /** 下行匹配「要了解的信息」时显示「信息」及展开数字 */
     showInfoTopics?: boolean;
-    /** 下行匹配老玩家提示时显示「出村」 */
-    showLeaveVillage?: boolean;
+    /** 下行拜师提示：与信息同套显示条件，紧挨「信息」 */
+    showBaiShi?: boolean;
+    /** 下行「你先去拜武伯」：与拜师同类 rematch */
+    showBaiWuBo?: boolean;
+    /** 下行 `[1;31mask hua` 等时显示「确认出村」 */
+    showConfirmLeaveVillage?: boolean;
     /** 下行匹配 1.快意恩仇 时显示 PVP / PVE */
     showKuaiyiPvpPve?: boolean;
+    /** 下行 `[1;36m1. 直接`：四钮发 1～4 */
+    showDirect14?: boolean;
     /** 下行匹配 closeeye 与「）」时显示「闭眼」 */
     showCloseEye?: boolean;
     /** 下行匹配 [1;36m老村长嘱咐道： 时显示「找花伯」（父组件聚合互斥） */
@@ -303,7 +349,9 @@ const props = withDefaults(
         pwdSuperButtons: () => [],
         showPwdNormalPrompt: false,
         pwdNormalButtons: () => [],
-        laoHuaboCooldownSec: 0
+        laoHuaboCooldownSec: 0,
+        showConfirmLeaveVillage: false,
+        showDirect14: false
     }
 );
 
@@ -350,8 +398,11 @@ const emits = defineEmits([
     'askLaoHereChoice',
     'washToChoice',
     'infoTopicChoice',
-    'leaveVillageChoice',
+    'baiShiChoice',
+    'baiWuBoChoice',
+    'confirmLeaveVillageChoice',
     'kuaiyiPvpPveChoice',
+    'direct14Choice',
     'closeEyeChoice',
     'laoHuaboChoice',
     'pageMoreChoice',
@@ -368,6 +419,8 @@ const emits = defineEmits([
 ]);
 
 const infoTopicNumbers = Array.from({ length: INF_N }, (_, i) => i + 1);
+/** `[1;36m1. 直接` 菜单：点击发送数字 */
+const direct14Digits = ['1', '2', '3', '4'] as const;
 const infoTopicsExpanded = ref(false);
 
 /** label 可带与服务器一致的 ASCII/ANSI 片段，界面显示用 Utils.parseMudLabelForDisplay */
@@ -521,17 +574,29 @@ const pickInfoTopic = (n: number) => {
     emits('infoTopicChoice', n);
 };
 
+const pickBaiShi = () => {
+    emits('baiShiChoice');
+};
+
+const pickBaiWuBo = () => {
+    emits('baiWuBoChoice');
+};
+
 /** 连续点击「信息」展开/收起 1～13 数字按钮 */
 const toggleInfoTopicsNumbers = () => {
     infoTopicsExpanded.value = !infoTopicsExpanded.value;
 };
 
-const pickLeaveVillage = () => {
-    emits('leaveVillageChoice');
+const pickConfirmLeaveVillage = () => {
+    emits('confirmLeaveVillageChoice');
 };
 
 const pickKuaiyiPvpPve = (cmd: string) => {
     emits('kuaiyiPvpPveChoice', cmd);
+};
+
+const pickDirect14 = (digit: string) => {
+    emits('direct14Choice', digit);
 };
 
 const pickCloseEye = () => {
@@ -677,6 +742,18 @@ watch(
     gap: 6px;
     align-items: center;
     pointer-events: auto;
+}
+/* 「信息」与「拜师」同一行 */
+.mud-info-bai-shi-row {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 6px;
+    vertical-align: top;
+}
+.mud-bai-shi-btn {
+    position: relative;
+    z-index: 3;
 }
 /* 信息：数字区绝对定位浮在「信息」按钮正上方 */
 .mud-info-topics-block {
