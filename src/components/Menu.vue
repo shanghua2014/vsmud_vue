@@ -9,9 +9,10 @@
             showCloseEye ||
             showAskLaoHuabo ||
             showWashTo ||
-            showInfoTopics ||
             showBaiShi ||
             showBaiWuBo ||
+            showZhaoCz ||
+            showZhunCc ||
             showConfirmLeaveVillage ||
             showAskLaoHere ||
             showEmailPrompt ||
@@ -24,6 +25,19 @@
         "
         class="mud-yn-actions pa"
     >
+        <template v-if="terminalScrolledUp">
+            <el-button
+                size="small"
+                type="primary"
+                plain
+                title="置底(alt+z)"
+                @click="pickScrollTerminalToBottom"
+            >
+                <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
+                置底
+            </el-button>
+        </template>
+        <template v-else>
         <template v-if="showQuanMingPrompt && quanMingButtons.length > 0">
             <el-button
                 v-for="(label, i) in quanMingButtons"
@@ -123,29 +137,9 @@
             {{ laoHuaboCooldownSec > 0 ? `找花伯 ${laoHuaboCooldownSec}s` : '找花伯' }}
         </el-button>
         <div
-            v-if="(showInfoTopics || showBaiShi || showBaiWuBo) && !showChooseCharacter"
+            v-if="(showBaiShi || showBaiWuBo || showZhaoCz || showZhunCc) && !showChooseCharacter"
             class="mud-info-bai-shi-row"
         >
-            <div v-if="showInfoTopics" class="mud-info-topics-block">
-                <div v-if="infoTopicsExpanded" class="mud-info-topic-float">
-                    <div class="mud-info-topic-grid">
-                        <el-button
-                            v-for="n in infoTopicNumbers"
-                            :key="n"
-                            size="small"
-                            type="primary"
-                            plain
-                            class="mud-info-topic-num"
-                            @click="pickInfoTopic(n)"
-                        >
-                            {{ n }}
-                        </el-button>
-                    </div>
-                </div>
-                <el-button size="small" type="primary" plain class="mud-info-toggle-btn" @click="toggleInfoTopicsNumbers">
-                    信息
-                </el-button>
-            </div>
             <el-button
                 v-if="showBaiShi"
                 size="small"
@@ -165,6 +159,26 @@
                 @click="pickBaiWuBo"
             >
                 拜武伯
+            </el-button>
+            <el-button
+                v-if="showZhaoCz"
+                size="small"
+                type="primary"
+                plain
+                class="mud-bai-shi-btn"
+                @click="pickZhaoCz"
+            >
+                找村长
+            </el-button>
+            <el-button
+                v-if="showZhunCc"
+                size="small"
+                type="primary"
+                plain
+                class="mud-bai-shi-btn"
+                @click="pickZhunCc"
+            >
+                准备出村
             </el-button>
         </div>
         <el-button
@@ -207,6 +221,7 @@
             >
                 {{ Utils.parseMudLabelForDisplay(opt.label) }}
             </el-button>
+        </template>
         </template>
     </div>
     <div ref="docMenuRootRef" class="mud-doc-menu pa">
@@ -278,8 +293,8 @@
 
 <script lang="ts" setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { Document } from '@element-plus/icons-vue'; // 导入图标组件
-import { INF_N, KY_PVE_CMD, KY_PVP_CMD } from '../common/mudDownlinkPrompts';
+import { Bottom, Document } from '@element-plus/icons-vue';
+import { KY_PVE_CMD, KY_PVP_CMD } from '../common/mudDownlinkPrompts';
 import { Utils } from '../../utils/utils';
 import type { DrawerProps } from 'element-plus';
 
@@ -298,12 +313,13 @@ const props = withDefaults(
     showAskLaoHere?: boolean;
     /** 下行匹配 washto 指令格式时显示「确定」 */
     showWashTo?: boolean;
-    /** 下行匹配「要了解的信息」时显示「信息」及展开数字 */
-    showInfoTopics?: boolean;
-    /** 下行拜师提示：与信息同套显示条件，紧挨「信息」 */
     showBaiShi?: boolean;
     /** 下行「你先去拜武伯」：与拜师同类 rematch */
     showBaiWuBo?: boolean;
+    /** 下行 `[2;37;0m武伯决定收你…`：找村长 rematch */
+    showZhaoCz?: boolean;
+    /** 下行老村长相关完成提示：准备出村 rematch */
+    showZhunCc?: boolean;
     /** 下行 `[1;31mask hua` 等时显示「确认出村」 */
     showConfirmLeaveVillage?: boolean;
     /** 下行匹配 1.快意恩仇 时显示 PVP / PVE */
@@ -318,6 +334,8 @@ const props = withDefaults(
     laoHuaboCooldownSec?: number;
     /** 下行 [37m== 未完 时显示「下一页」「结束」 */
     showPageMore?: boolean;
+    /** 终端未在底部（有回卷且 scrollTop 未到底）：本栏暂变为「置底」 */
+    terminalScrolledUp?: boolean;
     /** 桥接 [1;32m姓氏：与 surnameButtons 同时满足时显示 */
     showXingShiPrompt?: boolean;
     /** 由父组件根据卡片角色名拆分（3 字 1 钮，4 字 2 钮） */
@@ -351,7 +369,10 @@ const props = withDefaults(
         pwdNormalButtons: () => [],
         laoHuaboCooldownSec: 0,
         showConfirmLeaveVillage: false,
-        showDirect14: false
+        showDirect14: false,
+        showZhaoCz: false,
+        showZhunCc: false,
+        terminalScrolledUp: false
     }
 );
 
@@ -397,9 +418,10 @@ const emits = defineEmits([
     'characterChoice',
     'askLaoHereChoice',
     'washToChoice',
-    'infoTopicChoice',
     'baiShiChoice',
     'baiWuBoChoice',
+    'zhaoCzChoice',
+    'zhunCcChoice',
     'confirmLeaveVillageChoice',
     'kuaiyiPvpPveChoice',
     'direct14Choice',
@@ -415,13 +437,13 @@ const emits = defineEmits([
     /** 文档菜单「退出」：父组件触发 quit 流程 */
     'clearTerminal',
     /** 文档菜单「重连」 */
-    'reconnectMud'
+    'reconnectMud',
+    /** 菜单栏「置底」：xterm 滚到最新输出 */
+    'scrollTerminalToBottom'
 ]);
 
-const infoTopicNumbers = Array.from({ length: INF_N }, (_, i) => i + 1);
 /** `[1;36m1. 直接` 菜单：点击发送数字 */
 const direct14Digits = ['1', '2', '3', '4'] as const;
-const infoTopicsExpanded = ref(false);
 
 /** label 可带与服务器一致的 ASCII/ANSI 片段，界面显示用 Utils.parseMudLabelForDisplay */
 const characterChoices = [
@@ -570,10 +592,6 @@ const pickWashTo = () => {
     emits('washToChoice');
 };
 
-const pickInfoTopic = (n: number) => {
-    emits('infoTopicChoice', n);
-};
-
 const pickBaiShi = () => {
     emits('baiShiChoice');
 };
@@ -582,9 +600,12 @@ const pickBaiWuBo = () => {
     emits('baiWuBoChoice');
 };
 
-/** 连续点击「信息」展开/收起 1～13 数字按钮 */
-const toggleInfoTopicsNumbers = () => {
-    infoTopicsExpanded.value = !infoTopicsExpanded.value;
+const pickZhaoCz = () => {
+    emits('zhaoCzChoice');
+};
+
+const pickZhunCc = () => {
+    emits('zhunCcChoice');
 };
 
 const pickConfirmLeaveVillage = () => {
@@ -607,6 +628,10 @@ const pickLaoHuabo = () => {
     emits('laoHuaboChoice');
 };
 
+const pickScrollTerminalToBottom = () => {
+    emits('scrollTerminalToBottom');
+};
+
 function onMenuReconnect() {
     emits('reconnectMud');
     docMenuOpen.value = false;
@@ -621,13 +646,6 @@ function onMenuExit() {
     emits('clearTerminal');
     docMenuOpen.value = false;
 }
-
-watch(
-    () => props.showInfoTopics,
-    (v) => {
-        if (!v) infoTopicsExpanded.value = false;
-    }
-);
 
 // 监听 props.cmd 的变化，将其赋值给新变量
 watch(
@@ -688,6 +706,7 @@ watch(
     right: 0;
     padding: 10px !important;
 }
+/* 右下角文档入口：与终端置底钮分列，勿改 right/bottom 除非同步 Terminal .down-button */
 .mud-doc-menu {
     bottom: 31px;
     right: 1px;
@@ -735,15 +754,21 @@ watch(
 .mud-yn-actions {
     display: flex;
     flex-wrap: wrap;
-    max-width: calc(100% - 8px);
-    right: 1px;
+    /* 为右侧文档菜单(≈60px) + 置底钮列(与 Terminal 一致 72px) 留白 */
+    max-width: calc(100% - 80px);
+    right: 72px;
     bottom: 64px;
     z-index: 50;
     gap: 6px;
     align-items: center;
     pointer-events: auto;
 }
-/* 「信息」与「拜师」同一行 */
+/* 与 Element Plus 小按钮内图标+文字对齐（置底等） */
+.mud-yn-actions__btn-icon {
+    margin-right: 4px;
+    vertical-align: middle;
+}
+/* 拜师 / 拜武伯 / 找村长 / 准备出村 同一行 */
 .mud-info-bai-shi-row {
     display: inline-flex;
     flex-direction: row;
@@ -752,50 +777,6 @@ watch(
     vertical-align: top;
 }
 .mud-bai-shi-btn {
-    position: relative;
-    z-index: 3;
-}
-/* 信息：数字区绝对定位浮在「信息」按钮正上方 */
-.mud-info-topics-block {
-    --mud-info-num-size: 2.25rem;
-    position: relative;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    vertical-align: top;
-}
-.mud-info-topic-float {
-    position: absolute;
-    bottom: 100%;
-    right: 0;
-    left: auto;
-    z-index: 4;
-    margin-bottom: 6px;
-    padding: 6px;
-    background: #1a1a1a;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--el-border-radius-base);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
-}
-.mud-info-topic-grid {
-    display: grid;
-    grid-template-columns: repeat(4, var(--mud-info-num-size));
-    gap: 6px;
-}
-.mud-info-topic-num.el-button {
-    width: var(--mud-info-num-size);
-    min-width: var(--mud-info-num-size) !important;
-    max-width: var(--mud-info-num-size);
-    height: var(--mud-info-num-size);
-    padding: 0 !important;
-    margin: 0 !important;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-variant-numeric: tabular-nums;
-}
-.mud-info-toggle-btn {
     position: relative;
     z-index: 3;
 }

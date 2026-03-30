@@ -6,6 +6,7 @@
                 <Terminal
                     ref="terminalRef"
                     :dir-panel-on="dirPanelOn"
+                    :suppress-floating-down-btn="suppressTerminalFloatingDown"
                     @showDownward="onShowDownward"
                     @menuCommand="onMenuCmd"
                     @sendCommandToChannel="sendToChannel"
@@ -15,9 +16,10 @@
                     @chSel="onChSel"
                     @alh="onAlh"
                     @wash="onWash"
-                    @infT="onInfT"
                     @baiShi="onBaiShi"
                     @baiWuBo="onBaiWuBo"
+                    @zhaoCz="onZhaoCz"
+                    @zhunCc="onZhunCc"
                     @cfLv="onCfLv"
                     @ky="onKy"
                     @d14="onD14"
@@ -36,6 +38,7 @@
                 />
                 <Menu
                     v-model:dir-panel-on="dirPanelOn"
+                    :terminal-scrolled-up="terminalScrolledUp"
                     :show-xing-shi-prompt="showXingShiMenu"
                     :surname-buttons="surnameButtons"
                     :show-ming-zi-prompt="showMingZiMenu"
@@ -59,16 +62,18 @@
                     :show-choose-character="showChooseChar"
                     :show-ask-lao-here="showAskLao"
                     :show-wash-to="showWashTo"
-                    :show-info-topics="showInfoTopics"
                     :show-bai-shi="showBaiShi"
                     :show-bai-wu-bo="showBaiWuBo"
+                    :show-zhao-cz="showZhaoCz"
+                    :show-zhun-cc="showZhunCc"
                     :show-confirm-leave-village="showConfirmLeaveVillage"
                     @characterChoice="onCharacterChoice"
                     @askLaoHereChoice="onAskLaoHereChoice"
                     @washToChoice="onWashToChoice"
-                    @infoTopicChoice="onInfoTopicChoice"
                     @baiShiChoice="onBaiShiChoice"
                     @baiWuBoChoice="onBaiWuBoChoice"
+                    @zhaoCzChoice="onZhaoCzChoice"
+                    @zhunCcChoice="onZhunCcChoice"
                     @confirmLeaveVillageChoice="onConfirmLeaveVillageChoice"
                     :show-kuaiyi-pvp-pve="showKuaiyiPvpPve"
                     :show-direct-14="showDirect14Menu"
@@ -89,6 +94,7 @@
                     @pwdNormalChoice="onPwdNormalChoice"
                     @clearTerminal="onClearTerminal"
                     @reconnectMud="onReconnectMud"
+                    @scroll-terminal-to-bottom="onScrollTerminalToBottom"
                 />
                 <Status />
             </el-main>
@@ -127,11 +133,12 @@ import {
     ALH_CMD,
     BAISHI_CMD,
     BAIWUBO_CMD,
+    ZHAOCZ_CMD,
+    ZHUNCC_CMD,
     CE_CMD,
     HB_CMD,
     LV_CONFIRM_CMD,
-    WASH_CMD,
-    infTopicCmd
+    WASH_CMD
 } from './common/mudDownlinkPrompts';
 import { createS1, S1 } from './common/sessionOneShotPrompts';
 import {
@@ -167,8 +174,9 @@ watch(dirPanelOn, (on) => saveDirPan(on));
 const showLayout = ref(false);
 /** 与 localStorage（vsmud_sites）同步，首屏即可展示已保存站点 */
 const mudlist = ref<SiteCard[]>(loadSites());
-const hideMenu = ref(false);
 const menuCmd = ref('');
+/** 终端视口未在底部（与 Terminal showDownBtn 同源） */
+const terminalScrolledUp = ref(false);
 const selectedCategories = ref<string[]>(['chat', 'rumor']);
 // 修改变量名
 const loadScript = ref('');
@@ -179,13 +187,15 @@ const emailSrv = ref(false);
 const chooseCharSrv = ref(false);
 const askLaoSrv = ref(false);
 const washToSrv = ref(false);
-/** 终端下行「要了解的信息」提示 */
-const infTSrv = ref(false);
 const baiShiSrv = ref(false);
 /** 点「拜师」后隐藏；再次匹配成功（false->true）后恢复 */
 const baiShiReopen = createHiddenUntilRematchState();
 const baiWuBoSrv = ref(false);
 const baiWuBoReopen = createHiddenUntilRematchState();
+const zhaoCzSrv = ref(false);
+const zhaoCzReopen = createHiddenUntilRematchState();
+const zhunCcSrv = ref(false);
+const zhunCcReopen = createHiddenUntilRematchState();
 const kuaiyiSrv = ref(false);
 /** 下行 `[1;36m1. 直接`：菜单数字 1～4 */
 const d14Srv = ref(false);
@@ -335,19 +345,7 @@ const showAskLao = computed(
         !showDirect14Menu.value
 );
 
-/** 「信息」：下行 `infT` 且本会话未 suppress；不因点数字隐藏（仅「信息」展开/收起在 Menu 内） */
-const showInfoTopics = computed(
-    () =>
-        s1.shouldShow(S1.InfT, infTSrv.value) &&
-        !showChooseChar.value &&
-        !showKuaiyiPvpPve.value &&
-        !showCloseEye.value &&
-        !showAskLaoHuabo.value &&
-        !showConfirmLeaveVillage.value &&
-        !showDirect14Menu.value
-);
-
-/** 「拜师」：与「信息」相同互斥；下行 + rematch（本会话非 S1） */
+/** 「拜师」：下行 + rematch（本会话非 S1） */
 const showBaiShi = computed(
     () =>
         baiShiSrv.value &&
@@ -373,6 +371,28 @@ const showBaiWuBo = computed(
         !showDirect14Menu.value
 );
 
+/** 「找村长」：README `[2;37;0m武伯决定收你`；不与确认出村/直接 1–4 互斥 */
+const showZhaoCz = computed(
+    () =>
+        zhaoCzSrv.value &&
+        !zhaoCzReopen.hiddenAfterClick.value &&
+        !showChooseChar.value &&
+        !showKuaiyiPvpPve.value &&
+        !showCloseEye.value &&
+        !showAskLaoHuabo.value
+);
+
+/** 「准备出村」：与找村长相同互斥策略 */
+const showZhunCc = computed(
+    () =>
+        zhunCcSrv.value &&
+        !zhunCcReopen.hiddenAfterClick.value &&
+        !showChooseChar.value &&
+        !showKuaiyiPvpPve.value &&
+        !showCloseEye.value &&
+        !showAskLaoHuabo.value
+);
+
 /** 菜单栏「下一页」：性格四选一时让位 */
 const showPageMore = computed(
     () => pageMoreSrv.value && !showChooseChar.value && !showDirect14Menu.value
@@ -386,9 +406,10 @@ const showEmailMenu = computed(() => {
         !showChooseChar.value &&
         !showAskLao.value &&
         !showWashTo.value &&
-        !showInfoTopics.value &&
         !showBaiShi.value &&
         !showBaiWuBo.value &&
+        !showZhaoCz.value &&
+        !showZhunCc.value &&
         !showKuaiyiPvpPve.value &&
         !showCloseEye.value &&
         !showAskLaoHuabo.value &&
@@ -396,6 +417,37 @@ const showEmailMenu = computed(() => {
         !showDirect14Menu.value
     );
 });
+
+/** 与 Menu 浮动 `mud-yn-actions` 同条件，用于与终端「置底」钮互斥 */
+const mudFloatingPromptBarVisible = computed(
+    () =>
+        showYnPrompt.value ||
+        showMfPrompt.value ||
+        showChooseChar.value ||
+        showKuaiyiPvpPve.value ||
+        showDirect14Menu.value ||
+        showCloseEye.value ||
+        showAskLaoHuabo.value ||
+        showWashTo.value ||
+        showBaiShi.value ||
+        showBaiWuBo.value ||
+        showZhaoCz.value ||
+        showZhunCc.value ||
+        showConfirmLeaveVillage.value ||
+        showAskLao.value ||
+        showEmailMenu.value ||
+        showPageMore.value ||
+        (showQuanMingMenu.value && quanMingButtons.value.length > 0) ||
+        (showXingShiMenu.value && surnameButtons.value.length > 0) ||
+        (showMingZiMenu.value && mingZiButtons.value.length > 0) ||
+        (showPwdSuperMenu.value && pwdSuperButtons.value.length > 0) ||
+        (showPwdNormalMenu.value && pwdNormalButtons.value.length > 0)
+);
+
+const suppressTerminalFloatingDown = computed(
+    () => mudFloatingPromptBarVisible.value && terminalScrolledUp.value
+);
+
 const terminalRef = ref<{
     sendMq?: (cmd: string) => void;
     sendXs?: (ch: string) => void;
@@ -407,9 +459,10 @@ const terminalRef = ref<{
     sendChSel?: (cmd: string) => void;
     sendAlhChoice?: (cmd: string) => void;
     sendWashChoice?: (cmd: string) => void;
-    sendInfTopicChoice?: (cmd: string) => void;
     sendBaiShiChoice?: (cmd: string) => void;
     sendBaiWuBoChoice?: (cmd: string) => void;
+    sendZhaoCzChoice?: (cmd: string) => void;
+    sendZhunCcChoice?: (cmd: string) => void;
     sendCfLvChoice?: (cmd: string) => void;
     sendKyChoice?: (cmd: string) => void;
     sendDirect14?: (digit: string) => void;
@@ -421,6 +474,7 @@ const terminalRef = ref<{
     clearTerminal?: () => void;
     printLocalLine?: (text: string) => void;
     startQuitAndReturnList?: () => void;
+    scrollToBottom?: () => void;
 } | null>(null);
 
 /** 「找花伯」按钮出现后 10 秒内点击不发命令，仅终端提示；按钮上显示剩余秒数 */
@@ -523,9 +577,12 @@ const onReconnectMud = () => {
     });
 };
 
-// 显示或隐藏 “向下” 按钮
-const onShowDownward = (shouldHide: boolean) => {
-    hideMenu.value = false;
+const onShowDownward = (scrolledUp: boolean) => {
+    terminalScrolledUp.value = scrolledUp;
+};
+
+const onScrollTerminalToBottom = () => {
+    terminalRef.value?.scrollToBottom?.();
 };
 // 唤起前端界面
 const onMenuCmd = (cmd: string) => {
@@ -585,11 +642,6 @@ const onWash = (v: boolean) => {
     if (v) s1.suppress(S1.Em);
 };
 
-const onInfT = (v: boolean) => {
-    infTSrv.value = v;
-    if (v) s1.suppress(S1.Em);
-};
-
 const onBaiShi = (v: boolean) => {
     baiShiSrv.value = v;
     if (v) s1.suppress(S1.Em);
@@ -600,6 +652,18 @@ const onBaiWuBo = (v: boolean) => {
     baiWuBoSrv.value = v;
     if (v) s1.suppress(S1.Em);
     onHiddenUntilRematchSignal(baiWuBoReopen, v);
+};
+
+const onZhaoCz = (v: boolean) => {
+    zhaoCzSrv.value = v;
+    if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(zhaoCzReopen, v);
+};
+
+const onZhunCc = (v: boolean) => {
+    zhunCcSrv.value = v;
+    if (v) s1.suppress(S1.Em);
+    onHiddenUntilRematchSignal(zhunCcReopen, v);
 };
 
 const onCfLv = (v: boolean) => {
@@ -644,11 +708,14 @@ const onPageEndChoice = () => {
 
 const onMudSess = () => {
     s1.resetSession();
-    infTSrv.value = false;
     baiShiSrv.value = false;
     resetHiddenUntilRematchState(baiShiReopen);
     baiWuBoSrv.value = false;
     resetHiddenUntilRematchState(baiWuBoReopen);
+    zhaoCzSrv.value = false;
+    resetHiddenUntilRematchState(zhaoCzReopen);
+    zhunCcSrv.value = false;
+    resetHiddenUntilRematchState(zhunCcReopen);
     cfLvSrv.value = false;
     resetHiddenUntilRematchState(cfLvReopen);
     d14Srv.value = false;
@@ -714,10 +781,6 @@ const onWashToChoice = () => {
     s1.suppress(S1.Wash);
 };
 
-const onInfoTopicChoice = (index: number) => {
-    terminalRef.value?.sendInfTopicChoice?.(infTopicCmd(index));
-};
-
 const onBaiShiChoice = () => {
     terminalRef.value?.sendBaiShiChoice?.(BAISHI_CMD);
     markHiddenUntilRematchClicked(baiShiReopen, baiShiSrv.value);
@@ -726,6 +789,16 @@ const onBaiShiChoice = () => {
 const onBaiWuBoChoice = () => {
     terminalRef.value?.sendBaiWuBoChoice?.(BAIWUBO_CMD);
     markHiddenUntilRematchClicked(baiWuBoReopen, baiWuBoSrv.value);
+};
+
+const onZhaoCzChoice = () => {
+    markHiddenUntilRematchClicked(zhaoCzReopen, true);
+    terminalRef.value?.sendZhaoCzChoice?.(ZHAOCZ_CMD);
+};
+
+const onZhunCcChoice = () => {
+    markHiddenUntilRematchClicked(zhunCcReopen, true);
+    terminalRef.value?.sendZhunCcChoice?.(ZHUNCC_CMD);
 };
 
 const onConfirmLeaveVillageChoice = () => {

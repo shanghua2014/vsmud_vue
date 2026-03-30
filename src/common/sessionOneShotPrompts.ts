@@ -8,7 +8,6 @@ export const S1 = {
     ChSel: 'chSel',
     Alh: 'alh',
     Wash: 'wash',
-    InfT: 'infT',
     Ky: 'ky',
     CEye: 'cEye',
     LHb: 'lHb',

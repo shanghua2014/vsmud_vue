@@ -125,11 +125,13 @@ export interface BrPr {
     chSel: boolean;
     alh: boolean;
     wash: boolean;
-    infT: boolean;
-    /** 拜师：与「信息」同套显示条件 */
     baiShi: boolean;
     /** 拜武伯：与拜师同类 rematch */
     baiWuBo: boolean;
+    /** `[2;37;0m武伯决定收你…`：找村长，rematch */
+    zhaoCz: boolean;
+    /** 「老村长点头」或「你完成了老村长交给你的」：准备出村，rematch */
+    zhunCc: boolean;
     /** `[1;31mask hua` 等：确认出村 */
     cfLv: boolean;
     ky: boolean;
@@ -505,10 +507,10 @@ export class xTermLoginc {
                     // ??????????
                     const distanceToBottom = scrollHeight - scrollTop - clientHeight;
                     showDownBtn.value = distanceToBottom > 10;
-                    // ???? emit ??
                     emits('showDownward', showDownBtn.value);
                 };
                 viewEle.addEventListener('scroll', scrollListener);
+                scrollListener();
                 return () => {
                     if (viewEle && scrollListener) {
                         viewEle.removeEventListener('scroll', scrollListener);

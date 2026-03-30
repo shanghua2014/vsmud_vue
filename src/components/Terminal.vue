@@ -14,8 +14,17 @@
             </el-button>
         </div>
         <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" :placeholder="inputPlaceholder" ref="inputRef" class="terminal-input" />
-        <el-button v-if="showDownBtn" @click="scrollToBottom" class="down-button" title="置底(alt+z)">
-            <Bottom style="width: 31px; height: 1rem" />
+        <el-button
+            v-if="showDownBtn && !suppressFloatingDownBtn"
+            size="small"
+            type="primary"
+            plain
+            class="down-button"
+            title="置底(alt+z)"
+            @click="scrollToBottom"
+        >
+            <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
+            置底
         </el-button>
         <div v-if="showExitDirPanel" class="mud-dir-panel" role="presentation">
             <div class="dir-panel-capsule" role="group" aria-label="移动方向">
@@ -64,8 +73,10 @@ const props = withDefaults(
     defineProps<{
         /** 设置里可关；为 false 时不显示方向区（即便有出口数据） */
         dirPanelOn?: boolean;
+        /** 菜单栏已显示「置底」时隐藏本组件右下角浮动向下钮，避免重复 */
+        suppressFloatingDownBtn?: boolean;
     }>(),
-    { dirPanelOn: true }
+    { dirPanelOn: true, suppressFloatingDownBtn: false }
 );
 
 // 创建 xTerm 终端逻辑处理实例
@@ -148,9 +159,10 @@ const emits = defineEmits([
     'chSel',
     'alh',
     'wash',
-    'infT',
     'baiShi',
     'baiWuBo',
+    'zhaoCz',
+    'zhunCc',
     'cfLv',
     'ky',
     'd14',
@@ -187,9 +199,10 @@ function emitPrFalse(options: { includeEmail?: boolean } = {}) {
     emits('chSel', false);
     emits('alh', false);
     emits('wash', false);
-    emits('infT', false);
     emits('baiShi', false);
     emits('baiWuBo', false);
+    emits('zhaoCz', false);
+    emits('zhunCc', false);
     emits('cfLv', false);
     emits('ky', false);
     emits('d14', false);
@@ -322,9 +335,10 @@ onMounted(() => {
         emits('chSel', p.chSel);
         emits('alh', p.alh);
         emits('wash', p.wash);
-        emits('infT', p.infT);
         emits('baiShi', Boolean(p.baiShi));
         emits('baiWuBo', Boolean(p.baiWuBo));
+        emits('zhaoCz', Boolean(p.zhaoCz));
+        emits('zhunCc', Boolean(p.zhunCc));
         emits('cfLv', Boolean(p.cfLv));
         emits('ky', p.ky);
         emits('d14', Boolean(p.d14));
@@ -440,6 +454,7 @@ const scrollToBottom = () => {
     if (terminal.value) {
         terminal.value.scrollToBottom();
         showDownBtn.value = false;
+        emits('showDownward', false);
     }
 };
 
@@ -630,12 +645,6 @@ const sendWashChoice = (command: string) => {
     emits('wash', false);
 };
 
-const sendInfTopicChoice = (command: string) => {
-    runQuickAction(command);
-    inputBox.value = command;
-    handlefocus();
-};
-
 /** `BAISHI_CMD` / `BAIWUBO_CMD`：`;` 串联多句，按序各发一行 */
 const sendSemicolonChainChoice = (command: string, emitDone: () => void) => {
     if (!terminal.value) return;
@@ -655,6 +664,15 @@ const sendBaiShiChoice = (command: string) => {
 
 const sendBaiWuBoChoice = (command: string) => {
     sendSemicolonChainChoice(command, () => emits('baiWuBo', false));
+};
+
+/** 不 emit zhaoCz/zhunCc false：发送后桥接下帧仍常为 true，若本地置 false 会误判 rematch，按钮应仅靠父级 hiddenAfterClick 隐藏 */
+const sendZhaoCzChoice = (command: string) => {
+    sendSemicolonChainChoice(command, () => {});
+};
+
+const sendZhunCcChoice = (command: string) => {
+    sendSemicolonChainChoice(command, () => {});
 };
 
 const sendCfLvChoice = (command: string) => {
@@ -737,6 +755,7 @@ const printLocalLine = (text: string) => {
 };
 
 defineExpose({
+    scrollToBottom,
     startQuitAndReturnList,
     sendMq,
     sendXs,
@@ -748,9 +767,10 @@ defineExpose({
     sendChSel,
     sendAlhChoice,
     sendWashChoice,
-    sendInfTopicChoice,
     sendBaiShiChoice,
     sendBaiWuBoChoice,
+    sendZhaoCzChoice,
+    sendZhunCcChoice,
     sendCfLvChoice,
     sendKyChoice,
     sendDirect14,
@@ -831,14 +851,19 @@ onUnmounted(() => {
         }
     }
 
+    /*
+     * 与 Menu 一致：文档菜单 `.mud-doc-menu` 为 right:1px、宽约 60px；
+     * 置底放在其左侧，避免与文档图标、浮动菜单栏抢同一角。
+     */
     .down-button {
         position: absolute;
-        right: 1px;
-        bottom: 29px;
-        z-index: 1;
-        padding: 8px 14px;
-        background: #1f1f1f;
-        border-radius: var(--el-border-radius-base) var(--el-border-radius-base) 0 0;
+        right: 72px;
+        bottom: 31px;
+        z-index: 10;
+    }
+    .down-button .mud-yn-actions__btn-icon {
+        margin-right: 4px;
+        vertical-align: middle;
     }
 
     /* 方向区：叠在终端右侧，距容器底约 1/3 高度 */

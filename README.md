@@ -45,9 +45,9 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 ### 给 AI 的固定口令（推荐）
 
 ```text
-匹配：下行含 `[1;33m你先去拜武伯`
-按同类提示按钮模板接入：<拜武伯>
+匹配：下行含"[2;37;0m武伯决定收你"
+按同类提示按钮模板接入：<找村长>
 逻辑：点击隐藏，再次匹配恢复（rematch）
-命令："walk 练武场;bai wubo"(用";"做切割，依次发送命令)
+命令："w;w;ask cunzhang about ok"(用";"做切割，依次发送命令)
 范围：前后端都改
 ```
