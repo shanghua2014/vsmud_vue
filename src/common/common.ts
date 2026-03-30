@@ -155,6 +155,8 @@ export interface BrPr {
     enNmL?: boolean;
     qNew?: boolean;
     qDet?: boolean;
+    /** 网关下行本段匹配 NT 启动完毕：Terminal 整页刷新 */
+    reloadPage?: boolean;
 }
 
 /** 桥接管理密码：单按钮 */

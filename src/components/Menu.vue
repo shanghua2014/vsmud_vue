@@ -756,7 +756,7 @@ watch(
     flex-wrap: wrap;
     /* 为右侧文档菜单(≈60px) + 置底钮列(与 Terminal 一致 72px) 留白 */
     max-width: calc(100% - 80px);
-    right: 72px;
+    right: 0;
     bottom: 64px;
     z-index: 50;
     gap: 6px;

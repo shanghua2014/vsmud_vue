@@ -364,6 +364,11 @@ onMounted(() => {
         }
         updQaFromPr(p);
 
+        if (p.reloadPage) {
+            window.location.reload();
+            return;
+        }
+
         /** 分页「结束」后隐藏；仅依据桥接快照的 pgM */
         if (pageMoreHidden.value && !p.pgM) {
             pageMoreHidden.value = false;
