@@ -54,7 +54,7 @@
 import { ref, watch, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Edit, CloseBold, Plus, Delete } from '@element-plus/icons-vue';
-import { Base } from '@/common/common';
+import { mudBase } from '@/common/common';
 import { useConfigStore } from '@/stores/store';
 
 // 是否为创建状态
@@ -110,12 +110,10 @@ watch(
     { deep: true, immediate: true }
 );
 
-const base = new Base();
-
 const del = (card: any, i: number) => {
     // 根据下标删除数据
     cards.value.splice(i, 1);
-    base.sendSiteList({
+    mudBase.sendSiteList({
         type: 'del',
         content: getTrimData(card)
     });
@@ -198,8 +196,7 @@ const getTrimData = (card: any) => {
         password: card.password.trim(),
         managePassword: card.managePassword.trim(),
         name: card.name.trim(),
-        email: card.email.trim(),
-        charset: 'gb18030' as const
+        email: card.email.trim()
     };
 };
 
@@ -273,7 +270,7 @@ const saveEdit = (card: any) => {
         isCreated.value = false;
     }
 
-    base.sendSiteList({
+    mudBase.sendSiteList({
         type: 'save',
         content: getTrimData(card)
     });
@@ -341,7 +338,7 @@ const allowClicked = (card: any) => {
     // 等 Terminal 挂载并注册 to-vue 后再连（双重 nextTick 确保子组件 onMounted 已执行）
     void nextTick(() => {
         void nextTick(() => {
-            base.connect({
+            mudBase.connect({
                 type: 'telnet',
                 content: datas
             });

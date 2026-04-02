@@ -1,10 +1,8 @@
 import {
+    createVsmudOscCarryStripper,
     decodeMudPayload,
     decodeMudTextFromBase64,
-    encodeMudLine,
-    mudCharsetFromControlField,
-    normalizeMudCharset,
-    type MudCharset
+    encodeMudLine
 } from './mudEncoding';
 
 export interface Message {
@@ -52,8 +50,6 @@ export interface SiteCard {
     email: string;
     /** WebSocket ????? "/" */
     wsPath?: string;
-    /** 遗留字段；读写均按 GB18030，不再提供 UTF-8 选项 */
-    charset?: MudCharset;
     isEditing?: boolean;
 }
 
@@ -117,6 +113,12 @@ function siteId(s: Pick<SiteCard, 'account' | 'ip' | 'port'>): string {
     return `${s.ip?.trim() ?? ''}:${s.port?.trim() ?? ''}`;
 }
 
+/** 桥接层下发的当前 mygift 辅助任务（与 nt7_node BrMyGiftTask 一致） */
+export interface BrMyGiftTask {
+    need: number;
+    title: string;
+}
+
 /** 桥接层 mud-bridge-control 下发的提示快照（与 scripts 内字段名一致） */
 export interface BrPr {
     yn: boolean;
@@ -157,19 +159,21 @@ export interface BrPr {
     qDet?: boolean;
     /** 网关下行本段匹配 NT 启动完毕：Terminal 整页刷新 */
     reloadPage?: boolean;
+    /** mygift：条件数值 + 达成条件（网关从 MUD 缓冲解析） */
+    myGiftTask?: BrMyGiftTask;
 }
 
-/** 桥接管理密码：单按钮 */
+/** 桥接管理密码：单按钮；未填写时仍给占位文案，避免菜单区 `length>0` 条件导致按钮永远不出现 */
 export function pwdSuperBtns(managePassword: string | undefined | null): string[] {
     const t = (managePassword ?? '').trim();
-    if (!t) return [];
+    if (!t) return ['管理密码'];
     return [t];
 }
 
-/** 桥接普通密码：单按钮 */
+/** 桥接普通密码：单按钮；未填时占位，与 pwdSuperBtns 一致 */
 export function pwdNormBtns(password: string | undefined | null): string[] {
     const t = (password ?? '').trim();
-    if (!t) return [];
+    if (!t) return ['普通密码'];
     return [t];
 }
 
@@ -206,7 +210,6 @@ type MudEventPayload = {
 };
 
 let ws: WebSocket | null = null;
-let mudCs: MudCharset = 'gb18030';
 const evMap: Record<MudEventName, Set<(payload: any) => void>> = {
     'telnet-connected': new Set(),
     'telnet-error': new Set(),
@@ -271,7 +274,6 @@ export class Base {
                 name: c.name,
                 email: c.email ?? '',
                 wsPath: c.wsPath,
-                charset: 'gb18030',
                 isEditing: false
             };
             if (idx >= 0) sites[idx] = { ...sites[idx], ...next };
@@ -298,7 +300,6 @@ export class Base {
             emitEv('telnet-error', '请填写站点地址与端口');
             return;
         }
-        mudCs = normalizeMudCharset(site?.charset);
         if (ws && ws.readyState <= WebSocket.OPEN) {
             ws.close();
         }
@@ -310,6 +311,7 @@ export class Base {
               ? host!
               : mkWsUrl(host!, port!, wsPath);
         let opened = false;
+        const vsmudOscStrip = createVsmudOscCarryStripper();
         let socket: WebSocket;
         try {
             socket = new WebSocket(wsUrl);
@@ -328,7 +330,6 @@ export class Base {
                         connect: {
                             ip: host,
                             port,
-                            charset: mudCs,
                             wsPath
                         }
                     })
@@ -370,7 +371,6 @@ export class Base {
                         prompts?: BrPr;
                         exits?: BrEx;
                         roomTitle?: BrRt;
-                        charset?: string;
                         mudText?: string;
                         mudTextEnc?: 'base64';
                     };
@@ -394,13 +394,12 @@ export class Base {
                         parsed.prompts &&
                         typeof parsed.prompts === 'object'
                     ) {
-                        const ctlCs = mudCharsetFromControlField(parsed.charset);
                         const mt = typeof parsed.mudText === 'string' ? parsed.mudText : '';
                         let display = '';
                         if (mt.length > 0) {
                             if (parsed.mudTextEnc === 'base64') {
                                 try {
-                                    display = await decodeMudTextFromBase64(mt, ctlCs);
+                                    display = await decodeMudTextFromBase64(mt);
                                 } catch (e) {
                                     console.warn('[vsmud] mudText Base64 解码失败', e);
                                 }
@@ -427,16 +426,15 @@ export class Base {
                     }
                 } catch {
                     /** 非 JSON 文本帧：直连桥若用 UTF-8 文本转发 Telnet，须当正文显示 */
-                    emitEv('to-vue', { type: 'mud', content: payload });
+                    const text = vsmudOscStrip.push(payload);
+                    if (text.length > 0) emitEv('to-vue', { type: 'mud', content: text });
                 }
                 return;
             }
             try {
-                const content = await decodeMudPayload(
-                    payload as ArrayBuffer | Blob,
-                    mudCs
-                );
-                emitEv('to-vue', { type: 'mud', content });
+                let content = await decodeMudPayload(payload as ArrayBuffer | Blob);
+                content = vsmudOscStrip.push(content);
+                if (content.length > 0) emitEv('to-vue', { type: 'mud', content });
             } catch (e) {
                 console.warn('[vsmud] decode MUD binary failed:', e);
             }
@@ -451,9 +449,15 @@ export class Base {
 
     public sendMessage(cmd: string) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        ws.send(encodeMudLine(`${cmd}\r\n`, mudCs));
+        ws.send(encodeMudLine(`${cmd}\r\n`));
     }
 }
+
+/**
+ * 全应用唯一：站点列表持久化与 WebSocket 会话必须共用此实例，
+ * 否则 MudList 里 connect、Terminal 里 on('to-vue') 会落在不同对象上，表现为「已连接但终端无输出」。
+ */
+export const mudBase = new Base();
 
 // xTerm ????
 export class xTermLoginc {
@@ -539,23 +543,6 @@ export class xTermLoginc {
         };
     }
 
-    // ????
-    private copyText(terminal: any, inputRef: any, ElMessage: any) {
-        navigator.clipboard
-            .writeText(terminal.value.getSelection())
-            .then(() => {
-                ElMessage({
-                    message: '????',
-                    type: 'success',
-                    plain: true
-                });
-                inputRef.value?.focus();
-            })
-            .catch((err) => {
-                console.error('????:', err);
-            });
-    }
-
     // ??????
     public eventListener(terminal: any, inputRef: any, fitAddon: any, ElMessage: any) {
         // ??????????
@@ -566,47 +553,18 @@ export class xTermLoginc {
         // ?? Alt+Z ????
         this.setupAltZListener(terminal);
 
-        // ??????
-        let i = 0;
-        if (navigator.userAgent.indexOf('Windows') != -1) {
-            terminal.value.onKey((event: KeyboardEvent) => {
+        /** Windows：按键后恢复视口滚动位置，减轻 xterm 与外层布局的滚动跳动 */
+        if (navigator.userAgent.indexOf('Windows') !== -1) {
+            terminal.value.onKey(() => {
                 let currentScrollTop = 0;
-                // ????????
                 if (this.viewportElement) {
                     currentScrollTop = this.viewportElement.scrollTop;
                 }
-                switch (event.key) {
-                    case '\u0003':
-                        // ???Ctrl+C ????
-                        if (terminal.value && i === 0) {
-                            setTimeout(() => {
-                                i = 0;
-                            }, 1000);
-                            i++;
-                            this.copyText(terminal, inputRef, ElMessage);
-                        }
-                        break;
-                }
-
-                // ?? 1 ????????????
                 setTimeout(() => {
                     if (this.viewportElement) {
                         this.viewportElement.scrollTop = currentScrollTop;
                     }
                 }, 50);
-            });
-        } else {
-            window.addEventListener('keydown', (event: KeyboardEvent) => {
-                if (event.metaKey && event.key.toLowerCase() === 'c') {
-                    // ???cmd+C ????
-                    if (terminal.value && i === 0) {
-                        setTimeout(() => {
-                            i = 0;
-                        }, 1000);
-                        i++;
-                        this.copyText(terminal, inputRef, ElMessage);
-                    }
-                }
             });
         }
 

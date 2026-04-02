@@ -1,43 +1,31 @@
 <template>
     <div
         v-if="
-            showYnPrompt ||
-            showMfPrompt ||
-            showChooseCharacter ||
-            showKuaiyiPvpPve ||
-            showDirect14 ||
-            showCloseEye ||
-            showAskLaoHuabo ||
-            showWashTo ||
-            showBaiShi ||
-            showBaiWuBo ||
-            showZhaoCz ||
-            showZhunCc ||
-            showConfirmLeaveVillage ||
-            showAskLaoHere ||
-            showEmailPrompt ||
-            showPageMore ||
-            (showQuanMingPrompt && quanMingButtons.length > 0) ||
-            (showXingShiPrompt && surnameButtons.length > 0) ||
-            (showMingZiPrompt && mingZiButtons.length > 0) ||
-            (showPwdSuperPrompt && pwdSuperButtons.length > 0) ||
-            (showPwdNormalPrompt && pwdNormalButtons.length > 0)
+            !terminalScrolledUp &&
+            (showYnPrompt ||
+                showMfPrompt ||
+                showChooseCharacter ||
+                showKuaiyiPvpPve ||
+                showDirect14 ||
+                showCloseEye ||
+                showAskLaoHuabo ||
+                showWashTo ||
+                showBaiShi ||
+                showBaiWuBo ||
+                showZhaoCz ||
+                showZhunCc ||
+                showConfirmLeaveVillage ||
+                showAskLaoHere ||
+                showEmailPrompt ||
+                showPageMore ||
+                (showQuanMingPrompt && quanMingButtons.length > 0) ||
+                (showXingShiPrompt && surnameButtons.length > 0) ||
+                (showMingZiPrompt && mingZiButtons.length > 0) ||
+                (showPwdSuperPrompt && pwdSuperButtons.length > 0) ||
+                (showPwdNormalPrompt && pwdNormalButtons.length > 0))
         "
         class="mud-yn-actions pa"
     >
-        <template v-if="terminalScrolledUp">
-            <el-button
-                size="small"
-                type="primary"
-                plain
-                title="置底(alt+z)"
-                @click="pickScrollTerminalToBottom"
-            >
-                <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
-                置底
-            </el-button>
-        </template>
-        <template v-else>
         <template v-if="showQuanMingPrompt && quanMingButtons.length > 0">
             <el-button
                 v-for="(label, i) in quanMingButtons"
@@ -103,11 +91,11 @@
             <el-button size="small" type="primary" plain @click="pickYn('n')">否</el-button>
         </template>
         <template v-if="showMfPrompt">
-            <el-button size="small" type="primary" @click="pickMf('m')">男</el-button>
+            <el-button size="small" type="primary" plain @click="pickMf('m')">男</el-button>
             <el-button size="small" type="primary" plain @click="pickMf('f')">女</el-button>
         </template>
         <template v-if="showKuaiyiPvpPve && !showChooseCharacter">
-            <el-button size="small" type="primary" @click="pickKuaiyiPvpPve(KY_PVP_CMD)">快意恩仇-PVP</el-button>
+            <el-button size="small" type="primary" plain @click="pickKuaiyiPvpPve(KY_PVP_CMD)">快意恩仇-PVP</el-button>
             <el-button size="small" type="primary" plain @click="pickKuaiyiPvpPve(KY_PVE_CMD)">
                 江湖隐士-PVE
             </el-button>
@@ -222,7 +210,6 @@
                 {{ Utils.parseMudLabelForDisplay(opt.label) }}
             </el-button>
         </template>
-        </template>
     </div>
     <div ref="docMenuRootRef" class="mud-doc-menu pa">
         <button
@@ -293,7 +280,7 @@
 
 <script lang="ts" setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { Bottom, Document } from '@element-plus/icons-vue';
+import { Document } from '@element-plus/icons-vue';
 import { KY_PVE_CMD, KY_PVP_CMD } from '../common/mudDownlinkPrompts';
 import { Utils } from '../../utils/utils';
 import type { DrawerProps } from 'element-plus';
@@ -334,7 +321,7 @@ const props = withDefaults(
     laoHuaboCooldownSec?: number;
     /** 下行 [37m== 未完 时显示「下一页」「结束」 */
     showPageMore?: boolean;
-    /** 终端未在底部（有回卷且 scrollTop 未到底）：本栏暂变为「置底」 */
+    /** 终端未在底部：隐藏本浮动栏，「置底」由 Terminal 占原菜单栏位置显示 */
     terminalScrolledUp?: boolean;
     /** 桥接 [1;32m姓氏：与 surnameButtons 同时满足时显示 */
     showXingShiPrompt?: boolean;
@@ -438,8 +425,6 @@ const emits = defineEmits([
     'clearTerminal',
     /** 文档菜单「重连」 */
     'reconnectMud',
-    /** 菜单栏「置底」：xterm 滚到最新输出 */
-    'scrollTerminalToBottom'
 ]);
 
 /** `[1;36m1. 直接` 菜单：点击发送数字 */
@@ -628,10 +613,6 @@ const pickLaoHuabo = () => {
     emits('laoHuaboChoice');
 };
 
-const pickScrollTerminalToBottom = () => {
-    emits('scrollTerminalToBottom');
-};
-
 function onMenuReconnect() {
     emits('reconnectMud');
     docMenuOpen.value = false;
@@ -706,7 +687,7 @@ watch(
     right: 0;
     padding: 10px !important;
 }
-/* 右下角文档入口：与终端置底钮分列，勿改 right/bottom 除非同步 Terminal .down-button */
+/* 右下角文档入口；置底在 Terminal 已与菜单同列贴右（bottom:64px），此处保持低位 */
 .mud-doc-menu {
     bottom: 31px;
     right: 1px;
@@ -754,8 +735,8 @@ watch(
 .mud-yn-actions {
     display: flex;
     flex-wrap: wrap;
-    /* 为右侧文档菜单(≈60px) + 置底钮列(与 Terminal 一致 72px) 留白 */
-    max-width: calc(100% - 80px);
+    max-width: 100%;
+    box-sizing: border-box;
     right: 0;
     bottom: 64px;
     z-index: 50;

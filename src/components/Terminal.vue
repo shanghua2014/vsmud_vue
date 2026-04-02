@@ -1,21 +1,16 @@
 <template>
     <div class="terminal-wrapper">
         <div ref="terminalContainer" class="terminal-container" @click="handlefocus"></div>
-        <div class="quick-actions" v-if="quickActions.length">
-            <el-button
-                v-for="action in quickActions"
-                :key="action.id"
-                size="small"
-                type="primary"
-                plain
-                @click="runQuickAction(action)"
-            >
-                {{ action.label }}
-            </el-button>
-        </div>
-        <el-input v-model="inputBox" @keydown.enter="handleInput" @keydown="handleKeyDown" :placeholder="inputPlaceholder" ref="inputRef" class="terminal-input" />
+        <el-input
+            v-model="inputBox"
+            @keydown.enter="onEnterDown"
+            @keydown="handleKeyDown"
+            :placeholder="inputPlaceholder"
+            ref="inputRef"
+            class="terminal-input"
+        />
         <el-button
-            v-if="showDownBtn && !suppressFloatingDownBtn"
+            v-if="showDownBtn"
             size="small"
             type="primary"
             plain
@@ -26,6 +21,19 @@
             <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
             置底
         </el-button>
+        <div class="quick-actions" v-if="quickActions.length">
+            <el-button
+                v-for="action in quickActions"
+                :key="action.id"
+                size="small"
+                type="primary"
+                plain
+                :title="action.tip"
+                @click="runQuickAction(action)"
+            >
+                {{ action.label }}
+            </el-button>
+        </div>
         <div v-if="showExitDirPanel" class="mud-dir-panel" role="presentation">
             <div class="dir-panel-capsule" role="group" aria-label="移动方向">
                 <div class="dir-grid-5x5">
@@ -64,7 +72,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
-import { Base, xTermLoginc } from '@/common/common';
+import { mudBase, xTermLoginc } from '@/common/common';
 import { resetMudExitDirs, isExitButtonVisible, mudExitKeys } from '@/common/mudExitDirs';
 import { useConfigStore } from '@/stores/store';
 import type { MudVue, BrPr, BrEx, BrRt } from '@/common/common';
@@ -73,16 +81,14 @@ const props = withDefaults(
     defineProps<{
         /** 设置里可关；为 false 时不显示方向区（即便有出口数据） */
         dirPanelOn?: boolean;
-        /** 菜单栏已显示「置底」时隐藏本组件右下角浮动向下钮，避免重复 */
-        suppressFloatingDownBtn?: boolean;
     }>(),
-    { dirPanelOn: true, suppressFloatingDownBtn: false }
+    { dirPanelOn: true }
 );
 
 // 创建 xTerm 终端逻辑处理实例
 const logic = new xTermLoginc();
 // 创建基础服务实例
-const base = new Base();
+const base = mudBase;
 
 // 使用 ref 获取终端容器 DOM 元素
 const terminalContainer = ref<HTMLDivElement | null>(null);
@@ -96,11 +102,8 @@ const inputPlaceholder = ref('命令');
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
 
-const showExitDirPanel = computed(() => {
-    if (!props.dirPanelOn) return false;
-    const v = mudExitKeys.value;
-    return v !== null && v.length > 0;
-});
+/** 与设置「方向区」一致；不依赖出口是否已解析或非空（无出口时仍显示罗盘格与中央 Look） */
+const showExitDirPanel = computed(() => props.dirPanelOn);
 
 /** 5×5 方向格：四角为空；与图示一致（上行：东北-上方-西北 等） */
 type DirCell = null | { kind: 'look' } | { kind: 'move'; label: string; cmd: string };
@@ -145,6 +148,7 @@ const sendDir = (cmd: string) => {
 const lookBtnLabel = ref('Look');
 
 const sendLook = () => {
+    base.sendMessage('look');
     base.sendMessage('look');
 };
 
@@ -219,7 +223,14 @@ function emitPrFalse(options: { includeEmail?: boolean } = {}) {
     emits('pn2', false);
 }
 
-type QuickAction = { id: string; label: string; command?: string; type?: 'command' | 'focus' };
+type QuickAction = {
+    id: string;
+    label: string;
+    command?: string;
+    type?: 'command' | 'focus';
+    /** 悬停提示（如 mygift 条件数值） */
+    tip?: string;
+};
 const quickActions = ref<QuickAction[]>([]);
 /** 本会话内已自动发过站点卡片账号/密码，避免重复上行 */
 const autoAccountSent = ref(false);
@@ -232,6 +243,7 @@ const serverRawBuffer = ref('');
 const pageMoreHidden = ref(false);
 /** 本会话内已对「重新连线完毕」自动发过 look，避免缓冲区内重复命中 */
 const reconnectLookSent = ref(false);
+const lastBridgePr = ref<BrPr | null>(null);
 let removeScrollListener: () => void;
 let onConnected: (() => void) | null = null;
 let onError: ((msg: string) => void) | null = null;
@@ -264,6 +276,28 @@ onMounted(() => {
         fitAddon.fit();
     }
 
+    /** Ctrl+C / Cmd+C：有选区时复制到剪贴板，不向 MUD 发送 \\x03；无选区时保持默认（可发中断） */
+    terminal.value.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+        const isCopy =
+            (event.ctrlKey || event.metaKey) &&
+            !event.altKey &&
+            (event.key === 'c' || event.key === 'C');
+        if (!isCopy) return true;
+        const text = terminal.value?.getSelection() ?? '';
+        if (!text.length) return true;
+        event.preventDefault();
+        void navigator.clipboard.writeText(text).then(
+            () => {
+                ElMessage({ message: '已复制到剪贴板', type: 'success', plain: true });
+            },
+            (err) => {
+                console.error('[vsmud] 复制失败:', err);
+            }
+        );
+        inputRef.value?.focus?.();
+        return false;
+    });
+
     // 为终端添加一系列事件监听器
     logic.eventListener(terminal, inputRef, fitAddon, ElMessage);
 
@@ -284,6 +318,7 @@ onMounted(() => {
         autoAccountSent.value = false;
         autoPasswordSent.value = false;
         reconnectLookSent.value = false;
+        lastBridgePr.value = null;
         emits('mudSess');
     };
     onError = (msg: string) => {
@@ -294,11 +329,32 @@ onMounted(() => {
         if (p.rcD && !reconnectLookSent.value) {
             reconnectLookSent.value = true;
             base.sendMessage('look');
+            base.sendMessage('look');
             if (terminal.value) {
+                sendCommand('look', terminal, 'client');
                 sendCommand('look', terminal, 'client');
             }
         }
     };
+
+    /** 仍处于登录/注册/建号流程时不应因 MOTD 后自动 look 灌缓冲，也不依赖本包 decoded 含提示行 */
+    const inLoginOrCharCreate = (p: BrPr) =>
+        Boolean(
+            p.em ||
+            p.enNmL ||
+            p.qNew ||
+            p.qDet ||
+            p.yn ||
+            p.mf ||
+            p.chSel ||
+            p.lgPwdL ||
+            p.cxPwd ||
+            p.xsP ||
+            p.mzP ||
+            p.qmP ||
+            p.psP ||
+            p.pnP
+        );
 
     const updQaFromPr = (p: BrPr) => {
         const qn = p.qNew ?? false;
@@ -308,6 +364,14 @@ onMounted(() => {
             return;
         }
         const out: QuickAction[] = [];
+        if (p.myGiftTask) {
+            out.push({
+                id: 'mygift-cur',
+                label: `任务：${p.myGiftTask.title}`,
+                command: 'mygift',
+                tip: `条件数值（需达到）：${p.myGiftTask.need}`
+            });
+        }
         if (qn) out.push({ id: 'send-new', label: '发送 new', command: 'new' });
         if (qd) out.push({ id: 'send-y-detect', label: '发送 y', command: 'y' });
         const seen = new Set<string>();
@@ -325,6 +389,8 @@ onMounted(() => {
             finishQuitToList();
             return;
         }
+
+        lastBridgePr.value = p;
 
         emits('yn', p.yn);
         emits('mf', p.mf);
@@ -498,6 +564,15 @@ const sendCommand = (command: string, termRef: Ref<Terminal | null>, type?: 'cli
 };
 
 /**
+ * Enter：IME 拼音/注音等组合未结束时也会触发 keydown，若此时提交会表现为「按两次才生效」或误发空行。
+ */
+const onEnterDown = (ev: KeyboardEvent) => {
+    if (ev.key !== 'Enter') return;
+    if (ev.isComposing || ev.keyCode === 229) return;
+    void handleInput();
+};
+
+/**
  * 处理输入框的输入，将非空命令添加到历史记录并发送命令。
  * 支持用 ";" 连接多条命令：每批最多 {@link SEMICOLON_BATCH_MAX} 条；
  * 批内相邻两条间隔 {@link SEMICOLON_COMMAND_GAP_MS}ms；下一批开始前再间隔 {@link SEMICOLON_BATCH_GAP_MS}ms。
@@ -630,7 +705,12 @@ const sendPgEnd = () => {
 const sendRegEm = (email: string) => {
     const t = email.trim();
     if (!t) return;
-    runQuickAction(`reg ${t}`);
+    if (!terminal.value) return;
+    base.sendMessage('l');
+    sendCommand('l', terminal, 'client');
+    base.sendMessage(`reg ${t}`);
+    sendCommand(`reg ${t}`, terminal, 'client');
+    quickActions.value = [];
     emits('em', false);
 };
 
@@ -691,13 +771,14 @@ const sendKyChoice = (command: string) => {
     emits('ky', false);
 };
 
-/** `[1;36m1. 直接`：菜单发单字 1～4 */
+/** `[1;36m1. 直接`：菜单发 1～4，并在其后追加 `mygift`（分号串联，与拜师等一致） */
 const sendDirect14 = (digit: string) => {
     const d = digit.trim();
     if (!/^[1-4]$/.test(d)) return;
-    runQuickAction(d);
-    inputBox.value = '';
-    emits('d14', false);
+    sendSemicolonChainChoice(`${d};mygift`, () => {
+        inputBox.value = '';
+        emits('d14', false);
+    });
 };
 
 const sendCeChoice = (command: string) => {
@@ -824,15 +905,28 @@ onUnmounted(() => {
         z-index: 3;
         background: #141414;
     }
+    /*
+     * 与 .down-button 同列（右侧贴边），叠在菜单栏 .mud-yn-actions（bottom:64px）之上。
+     * 菜单栏高度按约一行快捷钮估算，若多行叠档可略调 --mud-menu-stack。
+     */
     .quick-actions {
+        --mud-menu-stack: 48px;
+        position: absolute;
+        right: 4px;
+        bottom: calc(64px + var(--mud-menu-stack) + 6px);
+        z-index: 55;
         display: flex;
-        gap: 6px;
-        padding: 6px 6px;
-        background: #0f0f0f;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        z-index: 3;
+        flex-direction: row;
         flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        max-width: min(56vw, 480px);
+        padding: 4px 8px;
+        background: rgba(20, 20, 20, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+        pointer-events: auto;
     }
 
     div.xterm {
@@ -857,14 +951,14 @@ onUnmounted(() => {
     }
 
     /*
-     * 与 Menu 一致：文档菜单 `.mud-doc-menu` 为 right:1px、宽约 60px；
-     * 置底放在其左侧，避免与文档图标、浮动菜单栏抢同一角。
+     * 右侧贴边，与菜单栏 .mud-yn-actions 同底（bottom:64px），紧贴其上方一行。
+     * 文档入口 `.mud-doc-menu` 仍在更低位（bottom:31px），与置底上下错开。
      */
     .down-button {
         position: absolute;
-        right: 72px;
-        bottom: 31px;
-        z-index: 10;
+        right: 0;
+        bottom: 64px;
+        z-index: 55;
     }
     .down-button .mud-yn-actions__btn-icon {
         margin-right: 4px;

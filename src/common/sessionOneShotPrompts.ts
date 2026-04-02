@@ -5,6 +5,8 @@ import { ref, type Ref } from 'vue';
  */
 export const S1 = {
     Em: 'em',
+    /** 性别 m/f：点选后本会话内隐藏，直至 resetSession */
+    Mf: 'mf',
     ChSel: 'chSel',
     Alh: 'alh',
     Wash: 'wash',

@@ -6,12 +6,11 @@
                 <Terminal
                     ref="terminalRef"
                     :dir-panel-on="dirPanelOn"
-                    :suppress-floating-down-btn="suppressTerminalFloatingDown"
                     @showDownward="onShowDownward"
                     @menuCommand="onMenuCmd"
                     @sendCommandToChannel="sendToChannel"
                     @yn="showYnPrompt = $event"
-                    @mf="showMfPrompt = $event"
+                    @mf="mfSrv = $event"
                     @em="onEmailPrompt"
                     @chSel="onChSel"
                     @alh="onAlh"
@@ -51,7 +50,7 @@
                     :pwd-normal-buttons="pwdNormalButtons"
                     :cmd="menuCmd"
                     :show-yn-prompt="showYnPrompt"
-                    :show-mf-prompt="showMfPrompt"
+                    :show-mf-prompt="showMfMenu"
                     :show-email-prompt="showEmailMenu"
                     @checkboxChange="onCheckboxChange"
                     @cancelSelection="onCancel"
@@ -94,7 +93,6 @@
                     @pwdNormalChoice="onPwdNormalChoice"
                     @clearTerminal="onClearTerminal"
                     @reconnectMud="onReconnectMud"
-                    @scroll-terminal-to-bottom="onScrollTerminalToBottom"
                 />
                 <Status />
             </el-main>
@@ -125,7 +123,7 @@ import {
     pwdSuperBtns,
     pwdNormBtns,
     type SiteCard,
-    Base
+    mudBase
 } from './common/common';
 import { storeToRefs } from 'pinia';
 import { useConfigStore } from './stores/store';
@@ -157,6 +155,11 @@ const mingZiSrv = ref(false);
 const mingZiButtons = computed(() => nameToMingZiBtns(cfg.value?.name));
 const quanMingSrv = ref(false);
 const quanMingButtons = computed(() => nameToFullNameBtns(cfg.value?.name));
+/** 角色名为恰好 2 个汉字时，「全名」与「名字」提示可能同时出现；此时应显示「名字」按钮，避免被全名条完全挡住 */
+const isTwoCharName = computed(() => {
+    const t = (cfg.value?.name ?? '').trim();
+    return [...t].length === 2;
+});
 const pwdSuperSrv = ref(false);
 const pwdSuperButtons = computed(() => pwdSuperBtns(cfg.value?.managePassword));
 const pwdNormalSrv = ref(false);
@@ -181,7 +184,8 @@ const selectedCategories = ref<string[]>(['chat', 'rumor']);
 // 修改变量名
 const loadScript = ref('');
 const showYnPrompt = ref(false);
-const showMfPrompt = ref(false);
+/** 终端侧性别提示（桥接 `mf`）；是否显示菜单见 `showMfMenu` */
+const mfSrv = ref(false);
 /** 终端侧原始信号（未套「本会话只出现一次」） */
 const emailSrv = ref(false);
 const chooseCharSrv = ref(false);
@@ -211,9 +215,6 @@ const cfLvSrv = ref(false);
 const cfLvReopen = createHiddenUntilRematchState();
 const s1 = createS1();
 
-/** 重连用（与 Terminal/MudList 同一模块级 WebSocket） */
-const mudBase = new Base();
-
 /** 姓名三步：桥接互斥（全名 > 名字 > 姓氏）且各步点选一次后本会话不再显示 */
 const quanMingVisible = computed(() =>
     s1.shouldShow(S1.QmNm, quanMingSrv.value)
@@ -232,12 +233,16 @@ const pwdNormalVisible = computed(() =>
 );
 
 const showQuanMingMenu = computed(
-    () => quanMingVisible.value && !pwdSuperVisible.value && !pwdNormalVisible.value
+    () =>
+        quanMingVisible.value &&
+        !pwdSuperVisible.value &&
+        !pwdNormalVisible.value &&
+        !(isTwoCharName.value && mingZiVisible.value)
 );
 const showMingZiMenu = computed(
     () =>
         mingZiVisible.value &&
-        !quanMingVisible.value &&
+        (!quanMingVisible.value || isTwoCharName.value) &&
         !pwdSuperVisible.value &&
         !pwdNormalVisible.value
 );
@@ -250,23 +255,21 @@ const showXingShiMenu = computed(
         !pwdNormalVisible.value
 );
 
-/** 与姓名/全名条互斥：桥接五选一；各步点选一次后本会话不再显示 */
+/**
+ * 管理密码条：仅与普通密码互斥。
+ * 姓名类（全名/名字/姓氏）条已在各自 computed 里用 `!pwdSuperVisible` 退让，此处不要再写
+ * `!mingZiVisible` 等，否则桥接同时给「名字 + 管理密码」时两边互斥为假，按钮会全不出现。
+ */
 const showPwdSuperMenu = computed(
-    () =>
-        pwdSuperVisible.value &&
-        !quanMingVisible.value &&
-        !mingZiVisible.value &&
-        !xingShiVisible.value &&
-        !pwdNormalVisible.value
+    () => pwdSuperVisible.value && !pwdNormalVisible.value
 );
+/** 与姓名条互斥已由姓名侧 `!pwdNormalVisible` 处理；此处仅与「管理密码」互斥 */
 const showPwdNormalMenu = computed(
-    () =>
-        pwdNormalVisible.value &&
-        !quanMingVisible.value &&
-        !mingZiVisible.value &&
-        !xingShiVisible.value &&
-        !pwdSuperVisible.value
+    () => pwdNormalVisible.value && !pwdSuperVisible.value
 );
+
+/** 性别 男/女：有下行且本会话内未点选过 */
+const showMfMenu = computed(() => s1.shouldShow(S1.Mf, mfSrv.value));
 
 /** 菜单区性格四选一：服务端有提示且本会话内尚未选过 */
 const showChooseChar = computed(() =>
@@ -418,36 +421,6 @@ const showEmailMenu = computed(() => {
     );
 });
 
-/** 与 Menu 浮动 `mud-yn-actions` 同条件，用于与终端「置底」钮互斥 */
-const mudFloatingPromptBarVisible = computed(
-    () =>
-        showYnPrompt.value ||
-        showMfPrompt.value ||
-        showChooseChar.value ||
-        showKuaiyiPvpPve.value ||
-        showDirect14Menu.value ||
-        showCloseEye.value ||
-        showAskLaoHuabo.value ||
-        showWashTo.value ||
-        showBaiShi.value ||
-        showBaiWuBo.value ||
-        showZhaoCz.value ||
-        showZhunCc.value ||
-        showConfirmLeaveVillage.value ||
-        showAskLao.value ||
-        showEmailMenu.value ||
-        showPageMore.value ||
-        (showQuanMingMenu.value && quanMingButtons.value.length > 0) ||
-        (showXingShiMenu.value && surnameButtons.value.length > 0) ||
-        (showMingZiMenu.value && mingZiButtons.value.length > 0) ||
-        (showPwdSuperMenu.value && pwdSuperButtons.value.length > 0) ||
-        (showPwdNormalMenu.value && pwdNormalButtons.value.length > 0)
-);
-
-const suppressTerminalFloatingDown = computed(
-    () => mudFloatingPromptBarVisible.value && terminalScrolledUp.value
-);
-
 const terminalRef = ref<{
     sendMq?: (cmd: string) => void;
     sendXs?: (ch: string) => void;
@@ -581,9 +554,6 @@ const onShowDownward = (scrolledUp: boolean) => {
     terminalScrolledUp.value = scrolledUp;
 };
 
-const onScrollTerminalToBottom = () => {
-    terminalRef.value?.scrollToBottom?.();
-};
 // 唤起前端界面
 const onMenuCmd = (cmd: string) => {
     console.log('唤起前端界面 ', cmd);
@@ -610,7 +580,7 @@ const onYnChoice = (v: 'y' | 'n') => {
 
 const onMfChoice = (v: 'm' | 'f') => {
     terminalRef.value?.sendMq?.(v);
-    showMfPrompt.value = false;
+    s1.suppress(S1.Mf);
 };
 
 const onEmailPrompt = (v: boolean) => {
@@ -745,20 +715,30 @@ const onQuanMingChoice = (fullName: string) => {
     s1.suppress(S1.QmNm);
 };
 
-const onPwdSuperChoice = (pwd: string) => {
+const onPwdSuperChoice = (_label: string) => {
+    const actual = (cfg.value?.managePassword ?? '').trim();
+    if (!actual) {
+        ElMessage.warning('请先在站点卡片填写管理密码');
+        return;
+    }
     const finalize = pwdSuperBothPhasesSeenSrv.value;
-    terminalRef.value?.sendPs?.(pwd, finalize);
+    terminalRef.value?.sendPs?.(actual, finalize);
     if (finalize) {
         s1.suppress(S1.Ps);
         pwdSuperSrv.value = false;
     }
 };
 
-const onPwdNormalChoice = (pwd: string) => {
+const onPwdNormalChoice = (_label: string) => {
+    const actual = (cfg.value?.password ?? '').trim();
+    if (!actual) {
+        ElMessage.warning('请先在站点卡片填写普通密码');
+        return;
+    }
     pwdNormalMenuClickCount.value += 1;
     const finalize =
         pwdNormalSecondSeenSrv.value || pwdNormalMenuClickCount.value >= 2;
-    terminalRef.value?.sendPn?.(pwd, finalize);
+    terminalRef.value?.sendPn?.(actual, finalize);
     if (finalize) {
         s1.suppress(S1.Pn);
         pwdNormalSrv.value = false;

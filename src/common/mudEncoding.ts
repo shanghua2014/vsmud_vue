@@ -1,47 +1,57 @@
-import iconv from 'iconv-lite';
-import { Buffer } from 'buffer';
+const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+const utf8Encoder = new TextEncoder();
 
-/** 与 MUD 交互固定走 GB18030（iconv 库名；与 GBK 常用字节兼容） */
-export type MudCharset = 'gb18030' | 'utf8';
-
-export function normalizeMudCharset(_raw?: string): MudCharset {
-    return 'gb18030';
-}
-
-export async function decodeMudPayload(
-    data: string | ArrayBuffer | Blob,
-    charset: MudCharset
-): Promise<string> {
+export async function decodeMudPayload(data: string | ArrayBuffer | Blob): Promise<string> {
     if (typeof data === 'string') return data;
     const ab = data instanceof Blob ? await data.arrayBuffer() : data;
-    const u8 = new Uint8Array(ab);
-    if (charset === 'utf8') {
-        return new TextDecoder('utf-8', { fatal: false }).decode(u8);
-    }
-    return iconv.decode(Buffer.from(u8), 'gb18030');
-}
-
-/** vsmud-control 里 `charset` 字段 → 与上行一致的 MudCharset */
-export function mudCharsetFromControlField(c: unknown): MudCharset {
-    if (c === 'utf8' || c === 'utf-8') return 'utf8';
-    return 'gb18030';
+    return utf8Decoder.decode(new Uint8Array(ab));
 }
 
 /**
- * nt7_node 对 `mudText` 传 Base64（本段 TCP 原始字节）；用本帧 `charset` 解码为终端字符串。
+ * nt7_node 对 `mudText` 传 Base64（本段 TCP 原始字节）；按 UTF-8 解码为终端字符串。
  */
-export async function decodeMudTextFromBase64(b64: string, charset: MudCharset): Promise<string> {
+export async function decodeMudTextFromBase64(b64: string): Promise<string> {
     const t = b64.replace(/\s/g, '');
     if (!t) return '';
     const bin = atob(t);
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 0xff;
-    return decodeMudPayload(u8.buffer, charset);
+    return utf8Decoder.decode(u8);
 }
 
-export function encodeMudLine(text: string, charset: MudCharset): Uint8Array {
-    if (charset === 'utf8') {
-        return new TextEncoder().encode(text);
-    }
-    return new Uint8Array(iconv.encode(text, 'gb18030'));
+export function encodeMudLine(text: string): Uint8Array {
+    return utf8Encoder.encode(text);
+}
+
+/** 静默 OSC，与网关剔除序列一致；直连 WebSocket 跨帧拼接后再剔，避免拆包进 xterm */
+const VSMUD_OSC_SEQ = '\x1b]777;vsmud;motd_done\x07';
+const VSMUD_OSC_RE = /\x1b\]777;vsmud;motd_done\x07/g;
+
+export type VsmudOscCarryStripper = {
+    push(chunk: string): string;
+    reset(): void;
+};
+
+export function createVsmudOscCarryStripper(): VsmudOscCarryStripper {
+    let carry = '';
+    return {
+        push(chunk: string): string {
+            let s = carry + chunk;
+            carry = '';
+            s = s.replace(VSMUD_OSC_RE, '');
+            const sig = VSMUD_OSC_SEQ;
+            for (let i = sig.length - 1; i >= 2; i--) {
+                const pref = sig.slice(0, i);
+                if (s.endsWith(pref)) {
+                    carry = pref;
+                    s = s.slice(0, -i);
+                    break;
+                }
+            }
+            return s;
+        },
+        reset() {
+            carry = '';
+        }
+    };
 }
