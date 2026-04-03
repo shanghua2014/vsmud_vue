@@ -119,6 +119,12 @@ export interface BrMyGiftTask {
     title: string;
 }
 
+/** 桥接匹配 `N、输入指令 … <command> …`：终端「辅助任务-N」（点击发送提取命令） */
+export interface BrAuxTaskFab {
+    n: string;
+    cmd: string;
+}
+
 /** 桥接层 mud-bridge-control 下发的提示快照（与 scripts 内字段名一致） */
 export interface BrPr {
     yn: boolean;
@@ -161,6 +167,124 @@ export interface BrPr {
     reloadPage?: boolean;
     /** mygift：条件数值 + 达成条件（网关从 MUD 缓冲解析） */
     myGiftTask?: BrMyGiftTask;
+    /** 网关解析：辅助任务按钮序号与上行命令 */
+    auxTaskFab?: BrAuxTaskFab;
+    /** 建号英文名提示命中；前端 `Utils.sessionItem('createUser', '1')` */
+    createUser?: 1;
+}
+
+/**
+ * 网关稀疏分组 prompts（与 nt7_node `BrPrWire` 一致）：仅传输为 true 的键，空组省略。
+ */
+export interface BrPrWire {
+    login?: Partial<
+        Pick<BrPr, 'yn' | 'mf' | 'em' | 'chSel' | 'lgPwdL' | 'enNmL' | 'qNew' | 'qDet'>
+    >;
+    card?: Partial<Pick<BrPr, 'xsP' | 'mzP' | 'qmP' | 'psP' | 'pnP' | 'psBoth' | 'pn2'>>;
+    guide?: Partial<
+        Pick<BrPr, 'alh' | 'wash' | 'baiShi' | 'baiWuBo' | 'zhaoCz' | 'zhunCc' | 'cfLv' | 'ky' | 'd14' | 'cEye' | 'lHb'>
+    >;
+    sys?: Partial<Pick<BrPr, 'cxPwd' | 'pgM' | 'quitAbd' | 'rcD' | 'reloadPage'>>;
+    myGiftTask?: BrMyGiftTask;
+    auxTaskFab?: BrAuxTaskFab;
+    createUser?: 1;
+}
+
+/** 扁平默认值：菜单与 snapBr 语义一致（未出现视为 false） */
+export function defaultBrPr(): BrPr {
+    return {
+        yn: false,
+        mf: false,
+        em: false,
+        chSel: false,
+        alh: false,
+        wash: false,
+        baiShi: false,
+        baiWuBo: false,
+        zhaoCz: false,
+        zhunCc: false,
+        cfLv: false,
+        ky: false,
+        d14: false,
+        cEye: false,
+        lHb: false,
+        cxPwd: false,
+        pgM: false,
+        quitAbd: false,
+        rcD: false,
+        xsP: false,
+        mzP: false,
+        qmP: false,
+        psP: false,
+        pnP: false,
+        psBoth: false,
+        pn2: false,
+        lgPwdL: false,
+        enNmL: false,
+        qNew: false,
+        qDet: false,
+        reloadPage: false
+    };
+}
+
+function isGroupedWirePrompts(o: Record<string, unknown>): boolean {
+    return 'login' in o || 'card' in o || 'guide' in o || 'sys' in o;
+}
+
+function flattenBrPrWire(w: BrPrWire): BrPr {
+    const L = w.login;
+    const C = w.card;
+    const G = w.guide;
+    const S = w.sys;
+    return {
+        ...defaultBrPr(),
+        yn: L?.yn === true,
+        mf: L?.mf === true,
+        em: L?.em === true,
+        chSel: L?.chSel === true,
+        lgPwdL: L?.lgPwdL === true,
+        enNmL: L?.enNmL === true,
+        qNew: L?.qNew === true,
+        qDet: L?.qDet === true,
+        xsP: C?.xsP === true,
+        mzP: C?.mzP === true,
+        qmP: C?.qmP === true,
+        psP: C?.psP === true,
+        pnP: C?.pnP === true,
+        psBoth: C?.psBoth === true,
+        pn2: C?.pn2 === true,
+        alh: G?.alh === true,
+        wash: G?.wash === true,
+        baiShi: G?.baiShi === true,
+        baiWuBo: G?.baiWuBo === true,
+        zhaoCz: G?.zhaoCz === true,
+        zhunCc: G?.zhunCc === true,
+        cfLv: G?.cfLv === true,
+        ky: G?.ky === true,
+        d14: G?.d14 === true,
+        cEye: G?.cEye === true,
+        lHb: G?.lHb === true,
+        cxPwd: S?.cxPwd === true,
+        pgM: S?.pgM === true,
+        quitAbd: S?.quitAbd === true,
+        rcD: S?.rcD === true,
+        reloadPage: S?.reloadPage === true,
+        myGiftTask: w.myGiftTask,
+        auxTaskFab: w.auxTaskFab,
+        ...(w.createUser === 1 ? { createUser: 1 as const } : {})
+    };
+}
+
+/**
+ * 将网关 `prompts`（分组稀疏或旧版扁平）规范为扁平 BrPr，供 Terminal 使用。
+ */
+export function normalizeBrPrPrompts(raw: unknown): BrPr {
+    if (!raw || typeof raw !== 'object') return defaultBrPr();
+    const o = raw as Record<string, unknown>;
+    if (isGroupedWirePrompts(o)) {
+        return flattenBrPrWire(raw as BrPrWire);
+    }
+    return { ...defaultBrPr(), ...(raw as Partial<BrPr>) };
 }
 
 /** 桥接管理密码：单按钮；未填写时仍给占位文案，避免菜单区 `length>0` 条件导致按钮永远不出现 */
@@ -186,7 +310,7 @@ export interface BrEx {
 /** 桥接层解析的状态行房间名 */
 export interface BrRt {
     /** null：未命中；非空：Look 按钮文案 */
-    nm: string | null;
+    curRoom: string | null;
 }
 
 export type MudVue =
@@ -368,7 +492,7 @@ export class Base {
                         channel?: string;
                         ready?: boolean;
                         error?: string;
-                        prompts?: BrPr;
+                        prompts?: BrPr | BrPrWire;
                         exits?: BrEx;
                         roomTitle?: BrRt;
                         mudText?: string;
@@ -412,7 +536,7 @@ export class Base {
                         }
                         emitEv('to-vue', {
                             type: 'bridge-control',
-                            prompts: parsed.prompts as BrPr,
+                            prompts: normalizeBrPrPrompts(parsed.prompts),
                             ...(typeof parsed.mudText === 'string'
                                 ? { mudText: parsed.mudText, mudTextEnc: parsed.mudTextEnc }
                                 : {}),

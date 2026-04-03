@@ -87,7 +87,7 @@
             </el-button>
         </template>
         <template v-if="showYnPrompt">
-            <el-button size="small" type="primary" @click="pickYn('y')">是</el-button>
+            <el-button size="small" type="primary" plain @click="pickYn('y')">是</el-button>
             <el-button size="small" type="primary" plain @click="pickYn('n')">否</el-button>
         </template>
         <template v-if="showMfPrompt">

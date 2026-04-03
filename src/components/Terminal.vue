@@ -9,18 +9,32 @@
             ref="inputRef"
             class="terminal-input"
         />
-        <el-button
-            v-if="showDownBtn"
-            size="small"
-            type="primary"
-            plain
-            class="down-button"
-            title="置底(alt+z)"
-            @click="scrollToBottom"
-        >
-            <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
-            置底
-        </el-button>
+        <div v-if="showDownBtn || showAuxTaskFabUi" class="terminal-right-fab-stack">
+            <el-button
+                v-if="auxTaskFabBridge && showAuxTaskFabUi"
+                size="small"
+                type="primary"
+                plain
+                class="down-button"
+                :title="auxTaskFabBridge.cmd"
+                @click="sendAuxTaskFabClick"
+            >
+                辅助任务-{{ auxTaskFabBridge.n }}
+            </el-button>
+            <el-button
+                v-if="showDownBtn"
+                size="small"
+                type="primary"
+                plain
+                class="down-button"
+                title="置底(alt+z)"
+                @click="scrollToBottom"
+            >
+                <el-icon class="mud-yn-actions__btn-icon"><Bottom /></el-icon>
+                置底
+            </el-button>
+            <div v-else-if="showAuxTaskFabUi" class="down-button-placeholder" aria-hidden="true"></div>
+        </div>
         <div class="quick-actions" v-if="quickActions.length">
             <el-button
                 v-for="action in quickActions"
@@ -73,9 +87,10 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
 import { mudBase, xTermLoginc } from '@/common/common';
+import { Utils } from '../../utils/utils';
 import { resetMudExitDirs, isExitButtonVisible, mudExitKeys } from '@/common/mudExitDirs';
 import { useConfigStore } from '@/stores/store';
-import type { MudVue, BrPr, BrEx, BrRt } from '@/common/common';
+import type { MudVue, BrPr, BrEx, BrRt, BrAuxTaskFab } from '@/common/common';
 
 const props = withDefaults(
     defineProps<{
@@ -101,6 +116,31 @@ const inputRef = ref<InstanceType<typeof ElInput> | null>(null);
 const inputPlaceholder = ref('命令');
 // 控制向下按钮是否显示，替换为简短变量名
 const showDownBtn = ref(false);
+/** 桥接 `auxTaskFab`：匹配 `N、输入指令 … help start …` 时显示「辅助任务-N」 */
+const auxTaskFabBridge = ref<BrAuxTaskFab | null>(null);
+/** 与 `roomTitle.curRoom` 同步；用于辅助任务按钮房间过滤 */
+const curRoomBridge = ref<string | null>(null);
+/** 会话中是否存在建号标记；存在时隐藏辅助任务按钮 */
+const hasCreateUserSession = ref(false);
+/** 点过 1-4 后，忽略后续重复 createUser 桥接，避免刚删又被写回 */
+const suppressCreateUserBridge = ref(false);
+/** 辅助任务按钮：点击后暂隐，直到下一次桥接重新匹配 */
+const auxTaskFabHiddenAfterClick = ref(false);
+const auxTaskFabSignal = ref(false);
+const auxTaskFabKey = ref('');
+
+const AUX_TASK_HIDE_ROOM = '泥潭注册室';
+const syncCreateUserSession = () => {
+    hasCreateUserSession.value = Utils.sessionItem('createUser') != null;
+};
+
+/** 有桥接辅助任务快照、当前房间不是注册室且未处于建号标记时才显示 */
+const showAuxTaskFabUi = computed(() => {
+    if (!auxTaskFabBridge.value) return false;
+    if (auxTaskFabHiddenAfterClick.value) return false;
+    if (hasCreateUserSession.value) return false;
+    return curRoomBridge.value !== AUX_TASK_HIDE_ROOM;
+});
 
 /** 与设置「方向区」一致；不依赖出口是否已解析或非空（无出口时仍显示罗盘格与中央 Look） */
 const showExitDirPanel = computed(() => props.dirPanelOn);
@@ -144,7 +184,7 @@ const sendDir = (cmd: string) => {
     base.sendMessage(cmd);
 };
 
-/** 方向盘中央文案：仅由桥接层 vsmud-control JSON 的 roomTitle.name 更新；直连无桥时保持 Look */
+/** 方向盘中央文案：仅由桥接层 vsmud-control JSON 的 roomTitle.curRoom 更新；直连无桥时保持 Look */
 const lookBtnLabel = ref('Look');
 
 const sendLook = () => {
@@ -252,6 +292,7 @@ let onDisconnected: (() => void) | null = null;
 
 // 组件挂载后执行初始化操作
 onMounted(() => {
+    syncCreateUserSession();
     // 创建 xTerm 终端实例
     terminal.value = new Terminal({
         fontFamily: 'Fira Code, Sarasa Mono SC Nerd, Courier New, monospace',
@@ -319,6 +360,8 @@ onMounted(() => {
         autoPasswordSent.value = false;
         reconnectLookSent.value = false;
         lastBridgePr.value = null;
+        auxTaskFabBridge.value = null;
+        curRoomBridge.value = null;
         emits('mudSess');
     };
     onError = (msg: string) => {
@@ -391,6 +434,28 @@ onMounted(() => {
         }
 
         lastBridgePr.value = p;
+        const nextAuxTaskFab = p.auxTaskFab ?? null;
+        const hasAuxTaskFab = Boolean(nextAuxTaskFab);
+        const nextAuxTaskFabKey = nextAuxTaskFab
+            ? `${nextAuxTaskFab.n}|${nextAuxTaskFab.cmd}`
+            : '';
+        if (
+            hasAuxTaskFab &&
+            (!auxTaskFabSignal.value || nextAuxTaskFabKey !== auxTaskFabKey.value)
+        ) {
+            auxTaskFabHiddenAfterClick.value = false;
+        }
+        auxTaskFabSignal.value = hasAuxTaskFab;
+        auxTaskFabKey.value = nextAuxTaskFabKey;
+        auxTaskFabBridge.value = nextAuxTaskFab;
+
+        if (p.createUser === 1 && !suppressCreateUserBridge.value) {
+            Utils.sessionItem('createUser', '1');
+            syncCreateUserSession();
+        }
+        if (p.createUser !== 1) {
+            suppressCreateUserBridge.value = false;
+        }
 
         emits('yn', p.yn);
         emits('mf', p.mf);
@@ -425,8 +490,9 @@ onMounted(() => {
                 mudExitKeys.value = sk;
             }
         }
-        if (rt && Object.prototype.hasOwnProperty.call(rt, 'nm')) {
-            lookBtnLabel.value = rt.nm ?? 'Look';
+        if (rt && Object.prototype.hasOwnProperty.call(rt, 'curRoom')) {
+            lookBtnLabel.value = rt.curRoom ?? 'Look';
+            curRoomBridge.value = rt.curRoom ?? null;
         }
         updQaFromPr(p);
 
@@ -486,6 +552,8 @@ onMounted(() => {
         pageMoreHidden.value = false;
         lookBtnLabel.value = 'Look';
         quickActions.value = [];
+        auxTaskFabBridge.value = null;
+        curRoomBridge.value = null;
         emitPrFalse();
     };
 
@@ -529,10 +597,30 @@ const scrollToBottom = () => {
     }
 };
 
+/** `sendCommand` 第三参：兼容原 `'client'` 字符串，或显式是否回显 */
+type SendCommandThird = 'client' | { type?: 'client'; showInTerminal?: boolean };
+
+function parseSendCommandThird(third: SendCommandThird | undefined): {
+    type: 'client' | undefined;
+    showInTerminal: boolean;
+} {
+    if (third === undefined) return { type: undefined, showInTerminal: false };
+    if (third === 'client') return { type: 'client', showInTerminal: false };
+    return {
+        type: third.type,
+        showInTerminal: third.showInTerminal ?? false
+    };
+}
+
 /**
- * 将命令回显到终端；`type === 'client'` 时为服务端自动上行等场景，样式与频道同步不同。
+ * 将命令发往频道/可选回显到终端。
+ * - `showInTerminal` 默认 false：不在 xterm 打印该行（菜单/自动上行等）；
+ *   输入框直发请传 `{ showInTerminal: true }`。
+ * - `type === 'client'` 时仍向频道 emit，样式与原先一致。
  */
-const sendCommand = (command: string, termRef: Ref<Terminal | null>, type?: 'client') => {
+const sendCommand = (command: string, termRef: Ref<Terminal | null>, third?: SendCommandThird) => {
+    const { type, showInTerminal } = parseSendCommandThird(third);
+
     if (type === 'client') {
         const parts = command.split('\\');
         emits('sendCommandToChannel', parts.at(-1) ?? command);
@@ -546,6 +634,11 @@ const sendCommand = (command: string, termRef: Ref<Terminal | null>, type?: 'cli
 
     /** 纯回车上行不在前端回显（避免刷屏 [↵]） */
     if (command === '') {
+        afterWrite();
+        return;
+    }
+
+    if (!showInTerminal) {
         afterWrite();
         return;
     }
@@ -566,7 +659,8 @@ const sendCommand = (command: string, termRef: Ref<Terminal | null>, type?: 'cli
 /**
  * Enter：IME 拼音/注音等组合未结束时也会触发 keydown，若此时提交会表现为「按两次才生效」或误发空行。
  */
-const onEnterDown = (ev: KeyboardEvent) => {
+const onEnterDown = (ev: Event | KeyboardEvent) => {
+    if (!(ev instanceof KeyboardEvent)) return;
     if (ev.key !== 'Enter') return;
     if (ev.isComposing || ev.keyCode === 229) return;
     void handleInput();
@@ -607,7 +701,7 @@ const handleInput = async () => {
         for (let i = 0; i < batch.length; i++) {
             if (i > 0) await delayMs(SEMICOLON_COMMAND_GAP_MS);
             base.sendMessage(batch[i]);
-            sendCommand(batch[i], terminal);
+            sendCommand(batch[i], terminal, { showInTerminal: true });
         }
     }
 };
@@ -616,9 +710,9 @@ const handleInput = async () => {
  * 处理键盘事件，支持 Alt + 上箭头回滚命令和 Alt + 下箭头翻到下一条命令。
  * @param event - 键盘事件对象
  */
-const handleKeyDown = (event: Event) => {
-    // 类型断言为 KeyboardEvent
-    const keyboardEvent = event as KeyboardEvent;
+const handleKeyDown = (event: Event | KeyboardEvent) => {
+    if (!(event instanceof KeyboardEvent)) return;
+    const keyboardEvent = event;
     if (keyboardEvent.key === 'ArrowUp') {
         // 调用封装方法回滚到上一条命令
         const previousCommand = logic.getPreviousCommand();
@@ -654,6 +748,17 @@ const runQuickAction = (action: QuickAction | string | undefined) => {
     sendCommand(action, terminal, 'client');
     // 点击后清空，等待下一次服务端提示刷新
     quickActions.value = [];
+};
+
+/** 桥接下发的辅助任务命令（如 `help start`） */
+const sendAuxTaskFabClick = () => {
+    const cmd = auxTaskFabBridge.value?.cmd?.trim();
+    if (!cmd) return;
+    suppressCreateUserBridge.value = true;
+    Utils.sessionItem('createUser', null);
+    syncCreateUserSession();
+    auxTaskFabHiddenAfterClick.value = true;
+    runQuickAction(cmd);
 };
 
 /** 菜单区 y/n 按钮调用：发送并收起菜单按钮 */
@@ -775,6 +880,9 @@ const sendKyChoice = (command: string) => {
 const sendDirect14 = (digit: string) => {
     const d = digit.trim();
     if (!/^[1-4]$/.test(d)) return;
+    suppressCreateUserBridge.value = true;
+    Utils.sessionItem('createUser', null);
+    syncCreateUserSession();
     sendSemicolonChainChoice(`${d};mygift`, () => {
         inputBox.value = '';
         emits('d14', false);
@@ -951,18 +1059,44 @@ onUnmounted(() => {
     }
 
     /*
-     * 右侧贴边，与菜单栏 .mud-yn-actions 同底（bottom:64px），紧贴其上方一行。
-     * 文档入口 `.mud-doc-menu` 仍在更低位（bottom:31px），与置底上下错开。
+     * 置底 +（可选）「辅助任务」：贴终端容器右缘；辅助在上、置底在下，文字均横向。
+     * 文档入口 `.mud-doc-menu` 仍在更低位（bottom:31px）。
      */
-    .down-button {
+    .terminal-right-fab-stack {
+        --fab-slot-h: 24px;
+        --fab-slot-w: 72px;
         position: absolute;
         right: 0;
         bottom: 64px;
-        z-index: 55;
+        /* 低于 Menu 的 .mud-yn-actions(z-index:50)，避免遮挡 y/n 按钮点击 */
+        z-index: 45;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-end;
+        margin: 0;
+        padding: 0;
+    }
+
+    .down-button {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        height: var(--fab-slot-h);
+        min-height: var(--fab-slot-h);
+        min-width: var(--fab-slot-w);
     }
     .down-button .mud-yn-actions__btn-icon {
         margin-right: 4px;
         vertical-align: middle;
+    }
+    /* 置底按钮隐藏时占位：让辅助任务按钮固定在“置底按钮上方”层位 */
+    .down-button-placeholder {
+        width: var(--fab-slot-w);
+        height: var(--fab-slot-h);
+        min-height: var(--fab-slot-h);
+        pointer-events: none;
+        visibility: hidden;
     }
 
     /* 方向区：叠在终端右侧，距容器底约 1/3 高度 */

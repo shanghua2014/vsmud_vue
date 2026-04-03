@@ -113,6 +113,7 @@ import Channel from './components/Channel.vue';
 import Status from './components/Status.vue';
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Utils } from '../utils/utils';
 import {
     loadSites,
     loadDirPan,
@@ -169,7 +170,6 @@ const pwdSuperBothPhasesSeenSrv = ref(false);
 const pwdNormalSecondSeenSrv = ref(false);
 /** 普通密码条点击次数：桥接未及时标二段时，第 2 次点击强制收起 */
 const pwdNormalMenuClickCount = ref(0);
-
 /** 设置抽屉内开关：是否显示终端方向区（持久化到 localStorage） */
 const dirPanelOn = ref(loadDirPan());
 watch(dirPanelOn, (on) => saveDirPan(on));
@@ -503,6 +503,7 @@ const sendToChannel = (command: string) => {
 // =======================
 const receive = {
     cardClicked: (showTerminal: boolean) => {
+        Utils.sessionItem('createUser', null);
         showLayout.value = showTerminal;
     }
 };
@@ -576,6 +577,12 @@ const onConfirm = (value: string[]) => {
 const onYnChoice = (v: 'y' | 'n') => {
     terminalRef.value?.sendMq?.(v);
     showYnPrompt.value = false;
+    if (v === 'n') {
+        zhaoCzSrv.value = false;
+        zhunCcSrv.value = false;
+        markHiddenUntilRematchClicked(zhaoCzReopen, true);
+        markHiddenUntilRematchClicked(zhunCcReopen, true);
+    }
 };
 
 const onMfChoice = (v: 'm' | 'f') => {

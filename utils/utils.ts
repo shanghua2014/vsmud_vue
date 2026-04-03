@@ -1,4 +1,27 @@
+/** `sessionStorage`：单参读、双参写；双参且第二参为 `null` 时删除该键 */
+function sessionItem(key: string): string | null;
+function sessionItem(key: string, value: string): void;
+function sessionItem(key: string, value: null): void;
+function sessionItem(key: string, value?: string | null): string | null | void {
+    try {
+        if (arguments.length === 1) {
+            return sessionStorage.getItem(key);
+        }
+        if (value == null) {
+            sessionStorage.removeItem(key);
+            return;
+        }
+        sessionStorage.setItem(key, value);
+    } catch {
+        if (arguments.length === 1) {
+            return null;
+        }
+    }
+}
+
 export const Utils = {
+    sessionItem,
+
     getLastStr: (str: unknown, symbol: string): string => {
         const arr = String(str).split(symbol);
         return arr[arr.length - 1];
